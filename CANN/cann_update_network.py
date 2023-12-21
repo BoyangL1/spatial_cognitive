@@ -19,7 +19,7 @@ class GridNeuronNetwork:
         # Place Cell Parameters
         self.n_place_cells = n_place_cells
         self.sigma = sigma
-        self.norm_const = 1 / (2 * np.pi * sigma**2)
+        # self.norm_const = 1 / (2 * np.pi * sigma**2)
         self.x_dim = x_dim
         self.y_dim = y_dim
         self.dist_thresh = dist_thresh
@@ -195,7 +195,7 @@ def flow_neuron_activity(GN, time_ind, v, theta, nflow, nphase, a, spike, spikin
 
     return r, r_field, r_r, r_l, r_d, r_u
 
-def flow_full_model(GN,x, y, vx, vy, time_ind, a, spike, spiking, r, r_r, r_l, r_d, r_u, r_masks,singleneuronrec, place_cell_spiking, place_activity, w_pg, place_cells, n_place_cells,w_r, w_l, w_u, w_d):
+def flow_full_model(GN, x, y, vx, vy, time_ind, a, spike, spiking, r, r_r, r_l, r_d, r_u, r_masks,singleneuronrec, place_cell_spiking, place_activity, w_pg, place_cells, n_place_cells,w_r, w_l, w_u, w_d):
     """ 
     The main funciton of the whole model, taking into account the place cell inputs.
     At each time of the simulation, the place cell activity state is updated and the grid cell activity state is updated based on the current position and velocity.

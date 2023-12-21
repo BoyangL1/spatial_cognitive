@@ -132,15 +132,6 @@ def get_trajectory(traj_filename, dt, num_minutes):
 
     return x, y, x_ind, y_ind, x_of_bins, y_of_bins, vx, vy, spatial_scale, boundaries, time_ind, traj_filename
 
-
-###############################################################################
-def setup_pg(h_grid, n_grid, n_place, rand_weights_max):
-    """
-    Initializes place to grid weights
-    """    
-    w_pg = np.reshape(stats.uniform.rvs(0, 0.00222, h_grid*n_grid*n_grid*n_place), (n_place, h_grid,n_grid,n_grid))
-    return w_pg
-
 ###############################################################################
 
 def set_inhib_length(h_grid, lexp, lmin, lmax):
@@ -322,5 +313,13 @@ def setup_population(h_grid, n_grid, npad, rinit):
     # return r_masks so don't have to recalculate each time
     return r, r_r, r_l, r_d, r_u, r_masks
 
+###############################################################################
+def setup_pg(h_grid, n_grid, n_place, rand_weights_max):
+    """
+    Initializes place to grid weights
+    """    
+    w_pg = np.reshape(stats.uniform.rvs(0, 0.00222, h_grid*n_grid*n_grid*n_place), (n_place, h_grid,n_grid,n_grid))
+    return w_pg
+
 if __name__ == "__main__":
-    print(set_inhib_length(5, 0, 12.5, 15))
+    print(set_inhib_length(5, -1, 12.5, 15))

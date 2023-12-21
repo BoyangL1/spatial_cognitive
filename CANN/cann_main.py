@@ -1,4 +1,3 @@
-import pyfftw
 import time
 import numpy as np
 import os
@@ -44,7 +43,7 @@ if __name__ == "__main__":
     lexp = -1  # -1 in paper
     wshift = 1
 
-    # Coupling Parameters (no coupling in this network, just kept for ease of using other functions)
+    # Coupling Parameters
     umag = 2.6  # 2.6 for rate model
     urad = 4.0  # 8.0 for rate model
     u_dv = 1  # 1 corresponds to dorsal to ventral

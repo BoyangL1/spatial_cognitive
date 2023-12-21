@@ -114,8 +114,7 @@ def update_activity_spike(r, r_field, spike, h, n, dt, tau, itter):
     alpha = 0.5  # scale factor from Alex's paper
     # initialize new spike array each time
     spike = np.zeros((h, n, n), dtype='int')
-    threshold = np.reshape(stats.uniform.rvs(
-        0, 1, size=h*n*n), (h, n, n))  # grab new thresholds
+    threshold = np.reshape(stats.uniform.rvs(0, 1, size=h*n*n), (h, n, n))  # grab new thresholds
 
     activity_mask = (r_field > 0.)*1  # use this to replace if r_field >0 loop
 
