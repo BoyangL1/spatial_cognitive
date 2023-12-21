@@ -2,7 +2,7 @@ import pyfftw
 import numpy as np
 from scipy import stats
 import cann_run_network as RN
-import place_cell_utilities as PCU
+from tqdm import tqdm
 
 #########################################################################
 ######## All functions used for flowing activity in the network###########
@@ -60,6 +60,7 @@ def update_neuron_activity(GN,r, r_r, r_l, r_d, r_u,r_masks,r_fft_plan, r_ifft_p
         rwu_u = RN.convolve_no(r_fft_plan, r_ifft_plan, r_u, w_u, GN.npad, GN.h)
         rwu_d = RN.convolve_no(r_fft_plan, r_ifft_plan, r_d, w_d, GN.npad, GN.h)
         rwu_r = RN.convolve_no(r_fft_plan, r_ifft_plan, r_r, w_r, GN.npad, GN.h)
+    # run coupled network convolutions
     elif GN.umag !=0 and GN.u_vd == 0 and GN.u_dv ==1:
         rwu_l = RN.convolve_dv(r_fft_plan, r_ifft_plan, r_l, w_l, GN.umag, GN.npad, GN.h)
         rwu_u = RN.convolve_dv(r_fft_plan, r_ifft_plan, r_u, w_u, GN.umag, GN.npad, GN.h)
@@ -77,10 +78,10 @@ def update_neuron_activity(GN,r, r_r, r_l, r_d, r_u,r_masks,r_fft_plan, r_ifft_p
         rwu_r = RN.convolve_both(r_fft_plan, r_ifft_plan, r_r, w_r, GN.umag, GN.npad, GN.h)
 
     # calculate fields
-    [r_l, r_field_l] = RN.calculate_field(r, r_l, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[0, :, :], a, 1.0-GN.vgain*vx, GN.h, GN.n, GN.npad, itter, 0)
-    [r_r, r_field_r] = RN.calculate_field(r, r_r, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[1, :, :], a, 1.0+GN.vgain*vx, GN.h, GN.n, GN.npad, itter, 0)
-    [r_u, r_field_u] = RN.calculate_field(r, r_u, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[2, :, :], a, 1.0+GN.vgain*vy, GN.h, GN.n, GN.npad, itter, 0)
-    [r_d, r_field_d] = RN.calculate_field(r, r_d, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[3, :, :], a, 1.0-GN.vgain*vy, GN.h, GN.n, GN.npad, itter, 0)
+    [r_l, r_field_l] = RN.calculate_field(r, r_l, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[0, :, :], a, 1.0-GN.vgain*vx, GN.h, GN.n, GN.npad, itter)
+    [r_r, r_field_r] = RN.calculate_field(r, r_r, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[1, :, :], a, 1.0+GN.vgain*vx, GN.h, GN.n, GN.npad, itter)
+    [r_u, r_field_u] = RN.calculate_field(r, r_u, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[2, :, :], a, 1.0+GN.vgain*vy, GN.h, GN.n, GN.npad, itter)
+    [r_d, r_field_d] = RN.calculate_field(r, r_d, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[3, :, :], a, 1.0-GN.vgain*vy, GN.h, GN.n, GN.npad, itter)
 
     # fix error r_field not being updated uniquely for each of the directions correctly
     r_field = r_field_l + r_field_r + r_field_u + r_field_d
@@ -101,66 +102,6 @@ def update_neuron_activity(GN,r, r_r, r_l, r_d, r_u,r_masks,r_fft_plan, r_ifft_p
         sna_eachlayer = -999
 
     return r, r_field, r_l, r_u, r_d, r_r, sna_eachlayer
-
-def update_neuron_activity_with_place(GN,r, r_r, r_l, r_d, r_u, r_masks,r_fft_plan, r_ifft_plan, vx, vy, r_field, spike, spiking, itter, singleneuronrec, time_ind, sna_eachlayer, row_record, col_record, curr_place_activity, w_pg,w_r, w_l, w_u, w_d, a):
-    """
-    update grid cell activity with place cell inputs
-    """
-    if GN.umag == 0 or GN.u_vd == 0 and GN.u_dv == 0:  # run uncoupled network convolutions
-        rwu_l = RN.convolve_no(r_fft_plan, r_ifft_plan, r_l, w_l, GN.npad, GN.h)
-        rwu_u = RN.convolve_no(r_fft_plan, r_ifft_plan, r_u, w_u, GN.npad, GN.h)
-        rwu_d = RN.convolve_no(r_fft_plan, r_ifft_plan, r_d, w_d, GN.npad, GN.h)
-        rwu_r = RN.convolve_no(r_fft_plan, r_ifft_plan, r_r, w_r, GN.npad, GN.h)
-    elif GN.umag !=0 and GN.u_vd == 0 and GN.u_dv ==1:
-        rwu_l = RN.convolve_dv(r_fft_plan, r_ifft_plan, r_l, w_l, GN.umag, GN.npad, GN.h)
-        rwu_u = RN.convolve_dv(r_fft_plan, r_ifft_plan, r_u, w_u, GN.umag, GN.npad, GN.h)
-        rwu_d = RN.convolve_dv(r_fft_plan, r_ifft_plan, r_d, w_d, GN.umag, GN.npad, GN.h)
-        rwu_r = RN.convolve_dv(r_fft_plan, r_ifft_plan, r_r, w_r, GN.umag, GN.npad, GN.h)
-    elif GN.umag !=0 and GN.u_vd == 1 and GN.u_dv ==0:
-        rwu_l = RN.convolve_vd(r_fft_plan, r_ifft_plan, r_l, w_l, GN.umag, GN.npad, GN.h)
-        rwu_u = RN.convolve_vd(r_fft_plan, r_ifft_plan, r_u, w_u, GN.umag, GN.npad, GN.h)
-        rwu_d = RN.convolve_vd(r_fft_plan, r_ifft_plan, r_d, w_d, GN.umag, GN.npad, GN.h)
-        rwu_r = RN.convolve_vd(r_fft_plan, r_ifft_plan, r_r, w_r, GN.umag, GN.npad, GN.h)
-    elif GN.umag !=0 and GN.u_vd ==1 and GN.u_dv ==1:
-        rwu_l = RN.convolve_both(r_fft_plan, r_ifft_plan, r_l, w_l, GN.umag, GN.npad, GN.h)
-        rwu_u = RN.convolve_both(r_fft_plan, r_ifft_plan, r_u, w_u, GN.umag, GN.npad, GN.h)
-        rwu_d = RN.convolve_both(r_fft_plan, r_ifft_plan, r_d, w_d, GN.umag, GN.npad, GN.h)
-        rwu_r = RN.convolve_both(r_fft_plan, r_ifft_plan, r_r, w_r, GN.umag, GN.npad, GN.h)
-
-    # get current iteration's place cell activity
-    curr_place_activity = curr_place_activity.reshape((GN.n_place_cells, 1, 1, 1))
-    p = np.sum((curr_place_activity*w_pg), 0)  # [h,n_grid_cells,n_grid_cells]
-
-    # calculate fields
-    [r_l, r_field_l] = RN.calculate_field(
-        r, r_l, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[0, :, :], a, 1.0-GN.vgain*vx, GN.h, GN.n, GN.npad, itter, p)
-    [r_r, r_field_r] = RN.calculate_field(
-        r, r_r, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[1, :, :], a, 1.0+GN.vgain*vx, GN.h, GN.n, GN.npad, itter, p)
-    [r_u, r_field_u] = RN.calculate_field(
-        r, r_u, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[2, :, :], a, 1.0+GN.vgain*vy, GN.h, GN.n, GN.npad, itter, p)
-    [r_d, r_field_d] = RN.calculate_field(
-        r, r_d, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[3, :, :], a, 1.0-GN.vgain*vy, GN.h, GN.n, GN.npad, itter, p)
-
-    # fix error r_field not being updated uniquely for each of the directions correctly
-    r_field = r_field_l + r_field_r + r_field_u + r_field_d
-
-    if GN.rnoise > 0.:
-        for k in range(0, GN.h, 1):
-            for i in range(0, GN.n, 1):
-                for j in range(0, GN.n, 1):
-                    r_field[k][i][j] = r_field[k][i][j] + \
-                        GN.rnoise * (2*stats.uniform.rvs()-1)
-    # update fields and weights
-    r = RN.update_activity_spike(r, r_field, spike, GN.h, GN.n, GN.dt, GN.tau, itter)
-    w_pg = RN.update_weights(GN.n_place_cells, GN.h, GN.n, curr_place_activity, r, w_pg, itter)
-
-    if singleneuronrec:  # get rate and spiking data for single units on each layer, hate nested if loops, but for now just leave it
-        sna_eachlayer[:, :, itter] = RN.get_singleneuron_activity(
-            sna_eachlayer, r, spike, spiking, itter, row_record, col_record)
-    else:
-        sna_eachlayer = -999
-
-    return r, r_field, r_l, r_u, r_d, r_r, sna_eachlayer, w_pg
 
 def flow_neuron_activity(GN, time_ind, v, theta, nflow, nphase, a, spike, spiking, r, r_r, r_l, r_d, r_u, r_masks,singleneuronrec,w_r, w_l, w_u, w_d):
     """
@@ -195,7 +136,62 @@ def flow_neuron_activity(GN, time_ind, v, theta, nflow, nphase, a, spike, spikin
 
     return r, r_field, r_r, r_l, r_d, r_u
 
-def flow_full_model(GN, x, y, vx, vy, time_ind, a, spike, spiking, r, r_r, r_l, r_d, r_u, r_masks,singleneuronrec, place_cell_spiking, place_activity, w_pg, place_cells, n_place_cells,w_r, w_l, w_u, w_d):
+def update_neuron_activity_with_traj(GN,r, r_r, r_l, r_d, r_u, r_masks,r_fft_plan, r_ifft_plan, vx, vy, r_field, spike, spiking, itter, singleneuronrec, time_ind, sna_eachlayer, row_record, col_record, w_r, w_l, w_u, w_d, a):
+    """
+    update grid cell activity with place cell inputs
+    """
+    if GN.umag == 0 or GN.u_vd == 0 and GN.u_dv == 0:  # run uncoupled network convolutions
+        rwu_l = RN.convolve_no(r_fft_plan, r_ifft_plan, r_l, w_l, GN.npad, GN.h)
+        rwu_u = RN.convolve_no(r_fft_plan, r_ifft_plan, r_u, w_u, GN.npad, GN.h)
+        rwu_d = RN.convolve_no(r_fft_plan, r_ifft_plan, r_d, w_d, GN.npad, GN.h)
+        rwu_r = RN.convolve_no(r_fft_plan, r_ifft_plan, r_r, w_r, GN.npad, GN.h)
+    elif GN.umag !=0 and GN.u_vd == 0 and GN.u_dv ==1:
+        rwu_l = RN.convolve_dv(r_fft_plan, r_ifft_plan, r_l, w_l, GN.umag, GN.npad, GN.h)
+        rwu_u = RN.convolve_dv(r_fft_plan, r_ifft_plan, r_u, w_u, GN.umag, GN.npad, GN.h)
+        rwu_d = RN.convolve_dv(r_fft_plan, r_ifft_plan, r_d, w_d, GN.umag, GN.npad, GN.h)
+        rwu_r = RN.convolve_dv(r_fft_plan, r_ifft_plan, r_r, w_r, GN.umag, GN.npad, GN.h)
+    elif GN.umag !=0 and GN.u_vd == 1 and GN.u_dv ==0:
+        rwu_l = RN.convolve_vd(r_fft_plan, r_ifft_plan, r_l, w_l, GN.umag, GN.npad, GN.h)
+        rwu_u = RN.convolve_vd(r_fft_plan, r_ifft_plan, r_u, w_u, GN.umag, GN.npad, GN.h)
+        rwu_d = RN.convolve_vd(r_fft_plan, r_ifft_plan, r_d, w_d, GN.umag, GN.npad, GN.h)
+        rwu_r = RN.convolve_vd(r_fft_plan, r_ifft_plan, r_r, w_r, GN.umag, GN.npad, GN.h)
+    elif GN.umag !=0 and GN.u_vd ==1 and GN.u_dv ==1:
+        rwu_l = RN.convolve_both(r_fft_plan, r_ifft_plan, r_l, w_l, GN.umag, GN.npad, GN.h)
+        rwu_u = RN.convolve_both(r_fft_plan, r_ifft_plan, r_u, w_u, GN.umag, GN.npad, GN.h)
+        rwu_d = RN.convolve_both(r_fft_plan, r_ifft_plan, r_d, w_d, GN.umag, GN.npad, GN.h)
+        rwu_r = RN.convolve_both(r_fft_plan, r_ifft_plan, r_r, w_r, GN.umag, GN.npad, GN.h)
+
+    # calculate fields
+    [r_l, r_field_l] = RN.calculate_field(
+        r, r_l, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[0, :, :], a, 1.0-GN.vgain*vx, GN.h, GN.n, GN.npad, itter)
+    [r_r, r_field_r] = RN.calculate_field(
+        r, r_r, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[1, :, :], a, 1.0+GN.vgain*vx, GN.h, GN.n, GN.npad, itter)
+    [r_u, r_field_u] = RN.calculate_field(
+        r, r_u, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[2, :, :], a, 1.0+GN.vgain*vy, GN.h, GN.n, GN.npad, itter)
+    [r_d, r_field_d] = RN.calculate_field(
+        r, r_d, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[3, :, :], a, 1.0-GN.vgain*vy, GN.h, GN.n, GN.npad, itter)
+
+    # fix error r_field not being updated uniquely for each of the directions correctly
+    r_field = r_field_l + r_field_r + r_field_u + r_field_d
+
+    if GN.rnoise > 0.:
+        for k in range(0, GN.h, 1):
+            for i in range(0, GN.n, 1):
+                for j in range(0, GN.n, 1):
+                    r_field[k][i][j] = r_field[k][i][j] + \
+                        GN.rnoise * (2*stats.uniform.rvs()-1)
+    # update fields and weights
+    r = RN.update_activity_spike(r, r_field, spike, GN.h, GN.n, GN.dt, GN.tau, itter)
+
+    if singleneuronrec:  # get rate and spiking data for single units on each layer, hate nested if loops, but for now just leave it
+        sna_eachlayer[:, :, itter] = RN.get_singleneuron_activity(
+            sna_eachlayer, r, spike, spiking, itter, row_record, col_record)
+    else:
+        sna_eachlayer = -999
+
+    return r, r_field, r_l, r_u, r_d, r_r, sna_eachlayer
+
+def flow_full_model(GN, x, y, vx, vy, time_ind, a, spike, spiking, r, r_r, r_l, r_d, r_u, r_masks,singleneuronrec, w_r, w_l, w_u, w_d):
     """ 
     The main funciton of the whole model, taking into account the place cell inputs.
     At each time of the simulation, the place cell activity state is updated and the grid cell activity state is updated based on the current position and velocity.
@@ -220,19 +216,11 @@ def flow_full_model(GN, x, y, vx, vy, time_ind, a, spike, spiking, r, r_r, r_l, 
     else:
         row_record = col_record = sna_eachlayer = -999
 
-    for itter in range(1, time_ind, 1):
-        # update place cell activity matrices based on current velocity/position
-        place_cell_spiking, place_activity = PCU.evaluate_spiking(
-            place_cell_spiking, place_activity, place_cells, x, y, itter)
-        curr_place_activity = place_activity[:, itter]
-        curr_place_activity = curr_place_activity.reshape((1, n_place_cells))
-        if np.mod(itter, 1000) == 0:
-            print(itter)
+    for itter in tqdm(range(1, time_ind, 1)):
         vx1 = vx[itter]
         vy1 = vy[itter]
         # update neuron activity for grid cells
-        [r, r_field, r_l, r_u, r_d, r_r, sna_eachlayer, w_pg] = update_neuron_activity_with_place(
-            GN, r, r_r, r_l, r_d, r_u, r_masks, r_fft_plan, r_ifft_plan, vx1, vy1, r_field, spike, spiking, itter, singleneuronrec, time_ind, sna_eachlayer, row_record, col_record, curr_place_activity, w_pg,w_r, w_l, w_u, w_d, a)
-        occ = 0
+        [r, r_field, r_l, r_u, r_d, r_r, sna_eachlayer] = update_neuron_activity_with_traj(
+            GN, r, r_r, r_l, r_d, r_u, r_masks, r_fft_plan, r_ifft_plan, vx1, vy1, r_field, spike, spiking, itter, singleneuronrec, time_ind, sna_eachlayer, row_record, col_record,w_r, w_l, w_u, w_d, a)
 
-    return r, r_field, r_r, r_l, r_d, r_u, sna_eachlayer, occ, w_pg
+    return r, r_field, r_r, r_l, r_d, r_u, sna_eachlayer

@@ -235,9 +235,20 @@ def setup_recurrent(h, npad, l_inhibition, wmag, wshift):
 
     return w, w_r, w_l, w_u, w_d
 
-
 def setup_input(amag, n_grid, falloff_high, falloff_low, falloff):
-    
+    """
+    Set up input distribution
+
+    Args:
+        amag : the strenght of input
+        n_grid : the length of grid cells
+        falloff_high : the upper bounds of stimulus attenuation.
+        falloff_low : the lower bounds of stimulus attenuation.
+        falloff : controls the rate at which the stimulus decays with distance.
+
+    Returns:
+        array: stimulus attenuation per grid
+    """
     a = np.zeros((n_grid, n_grid))  # initialize a to be size of neural sheet
     scaled = np.zeros(n_grid)
 
@@ -269,7 +280,6 @@ def setup_input(amag, n_grid, falloff_high, falloff_low, falloff):
                 a[i][j] = amag * np.exp(-falloff * rshifted*rshifted)
 
     return a
-
 
 def setup_population(h_grid, n_grid, npad, rinit):
     r = np.zeros((h_grid, npad, npad))  # just to multiply

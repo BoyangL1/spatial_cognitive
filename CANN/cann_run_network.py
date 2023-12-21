@@ -75,9 +75,9 @@ def convolve_both(r_fft_plan, r_ifft_plan, r_dir, w_dir, u, npad, h):
 
     return rwu_dir
 
-def calculate_field(r, r_dir, rwu_l, rwu_r, rwu_d, rwu_u, r_masks, a, vgain_fac, h, n, npad, itter, p):
+def calculate_field(r, r_dir, rwu_l, rwu_r, rwu_d, rwu_u, r_masks, a, vgain_fac, h, n, npad, itter):
     """ 
-    Calculate field with hippocampal input after all rates are updated from convolution
+    Calculate field with input after all rates are updated from convolution
     """
     r_temp = np.zeros((h, npad, npad))
     r_field_dir = np.zeros((h, n, n))
@@ -88,7 +88,7 @@ def calculate_field(r, r_dir, rwu_l, rwu_r, rwu_d, rwu_u, r_masks, a, vgain_fac,
     r_field_mask = r_masks[0:n, 0:n]
 
     r_field_dir[:, :, :] = (rwu_l[:, 0:n, 0:n] + rwu_r[:, 0:n, 0:n] +
-                            rwu_u[:, 0:n, 0:n] + rwu_d[:, 0:n, 0:n] + a * vgain_fac + p)*r_field_mask
+                            rwu_u[:, 0:n, 0:n] + rwu_d[:, 0:n, 0:n] + a * vgain_fac)*r_field_mask
 
     return r_dir, r_field_dir
 
@@ -143,7 +143,21 @@ def update_weights(n_place, h, n, p_activity, r, w_pg, itter):
 
 
 def get_singleneuron_activity(sna_eachlayer, r_field, spike, spiking, itter, row_record, col_record):
+    """
+    Retrieves and records the activity of single neurons across layers at different time points.
 
+    Args:
+        sna_eachlayer (numpy.ndarray): A 3D array storing the activity data of neurons in each layer, with the time dimension being the last one.
+        r_field (numpy.ndarray): An array representing the receptive field of neurons, possibly containing the response strength of neurons to certain stimuli.
+        spike : Unused in the function body, may be intended for other purposes.
+        spiking : Unused in the function body, may be intended for other purposes.
+        itter (int): The index of the current iteration or time point.
+        row_record (list of int): A list of row indices indicating the positions of neurons.
+        col_record (list of int): A list of column indices indicating the positions of neurons.
+
+    Returns:
+        The updated slice of the sna_eachlayer array for the specified time point, containing neuronal activity data for that specific moment.
+    """
     sna_eachlayer[:, 0, int(itter)] = r_field[:, row_record[0], col_record[0]]
     sna_eachlayer[:, 1, int(itter)] = r_field[:, row_record[1], col_record[1]]
     sna_eachlayer[:, 2, int(itter)] = r_field[:, row_record[2], col_record[2]]
