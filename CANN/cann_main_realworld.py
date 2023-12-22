@@ -151,7 +151,7 @@ if __name__ == "__main__":
     for z in range(0, h, 1):
         plt.figure()
         plt.imshow(r[z, :, :], cmap='hot')
-        plt.savefig(f'./img/grid_cell_result_{z}.png')  # Save the figure
+        plt.savefig(f'./img/grid_cell_result_{z}.png')  
 
     # plot with real traj
     df = pd.read_csv(file_name)
@@ -168,7 +168,7 @@ if __name__ == "__main__":
             # gdf.plot(ax=ax, edgecolor='blue')
             
             # Method 1
-            # colors = ['blue' if val else 'red' for val in sns_eachlayer[z, cell_index, :]]
+            # colors = ['blue' if val else 'red' for val in sns_eachlayer[z, cell_index, :plot_num]]
             # ax.scatter(x, y, c=colors)
             
             # Method 2
@@ -177,4 +177,4 @@ if __name__ == "__main__":
             ax.set_xlabel('Longitude')
             ax.set_ylabel('Latitude')
 
-            plt.savefig(f"./img/cell_{cell_index}_layer_{z}.png")
+            plt.savefig(f"./img/cell_{cell_index}_layer_{z}.png",dpi=600)
