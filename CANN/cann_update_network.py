@@ -51,7 +51,7 @@ class GridNeuronNetwork:
         self.rnoise = rnoise
         self.vgain = vgain
         
-def update_neuron_activity(GN,r, r_r, r_l, r_d, r_u,r_masks,r_fft_plan, r_ifft_plan, vx, vy, r_field, spike, spiking, itter, singleneuronrec, time_ind, sna_eachlayer, row_record, col_record, w_r, w_l, w_u, w_d, a):
+def update_neuron_activity(GN,r, r_r, r_l, r_d, r_u,r_masks,r_fft_plan, r_ifft_plan, vx, vy, r_field, itter, singleneuronrec, time_ind, sna_eachlayer, row_record, col_record, w_r, w_l, w_u, w_d, a):
     """
     Updating grid cell activity without place cell inputs
     """
@@ -93,19 +93,19 @@ def update_neuron_activity(GN,r, r_r, r_l, r_d, r_u,r_masks,r_fft_plan, r_ifft_p
                     r_field[k][i][j] = r_field[k][i][j] + \
                         GN.rnoise * (2*stats.uniform.rvs()-1)
     # update fields and weights
-    r = RN.update_activity_spike(r, r_field, spike, GN.h, GN.n, GN.dt, GN.tau, itter)
+    r = RN.update_activity_spike(r, r_field, GN.h, GN.n, GN.dt, GN.tau)
 
     if singleneuronrec:  # get rate and spiking data for single units on each layer, hate nested if loops, but for now just leave it
         sna_eachlayer[:, :, itter] = RN.get_singleneuron_activity(
-            sna_eachlayer, r, spike, spiking, itter, row_record, col_record)
+            sna_eachlayer, r, itter, row_record, col_record)
     else:
         sna_eachlayer = -999
 
     return r, r_field, r_l, r_u, r_d, r_r, sna_eachlayer
 
-def flow_neuron_activity(GN, time_ind, v, theta, nflow, nphase, a, spike, spiking, r, r_r, r_l, r_d, r_u, r_masks,singleneuronrec,w_r, w_l, w_u, w_d):
+def flow_neuron_activity(GN, time_ind, v, theta, nflow, nphase, a, r, r_r, r_l, r_d, r_u, r_masks,singleneuronrec,w_r, w_l, w_u, w_d):
     """
-    Simulating neuronal activity over time without place cell inputs
+    Simulating neuronal activity over time with real trajectory
     """
     print(nphase)
     vx = v * np.cos(theta)
@@ -132,11 +132,11 @@ def flow_neuron_activity(GN, time_ind, v, theta, nflow, nphase, a, spike, spikin
     for itter in range(1, nflow+1, 1):
         # update neuron activity for grid cells with no place input
         [r, r_field, r_l, r_u, r_d, r_r, sna_eachlayer] = update_neuron_activity(
-            GN, r, r_r, r_l, r_d, r_u, r_masks,r_fft_plan, r_ifft_plan, vx, vy, r_field, spike, spiking, itter, singleneuronrec, nflow, sna_eachlayer, row_record, col_record, w_r, w_l, w_u, w_d, a)
+            GN, r, r_r, r_l, r_d, r_u, r_masks,r_fft_plan, r_ifft_plan, vx, vy, r_field, itter, singleneuronrec, nflow, sna_eachlayer, row_record, col_record, w_r, w_l, w_u, w_d, a)
 
     return r, r_field, r_r, r_l, r_d, r_u
 
-def update_neuron_activity_with_traj(GN,r, r_r, r_l, r_d, r_u, r_masks,r_fft_plan, r_ifft_plan, vx, vy, r_field, spike, spiking, itter, singleneuronrec, time_ind, sna_eachlayer, row_record, col_record, w_r, w_l, w_u, w_d, a):
+def update_neuron_activity_with_traj(GN,r, r_r, r_l, r_d, r_u, r_masks,r_fft_plan, r_ifft_plan, vx, vy, r_field, itter, singleneuronrec, time_ind, sna_eachlayer, row_record, col_record, w_r, w_l, w_u, w_d, a):
     """
     update grid cell activity with place cell inputs
     """
@@ -181,17 +181,17 @@ def update_neuron_activity_with_traj(GN,r, r_r, r_l, r_d, r_u, r_masks,r_fft_pla
                     r_field[k][i][j] = r_field[k][i][j] + \
                         GN.rnoise * (2*stats.uniform.rvs()-1)
     # update fields and weights
-    r = RN.update_activity_spike(r, r_field, spike, GN.h, GN.n, GN.dt, GN.tau, itter)
+    r = RN.update_activity_spike(r, r_field, GN.h, GN.n, GN.dt, GN.tau)
 
     if singleneuronrec:  # get rate and spiking data for single units on each layer, hate nested if loops, but for now just leave it
         sna_eachlayer[:, :, itter] = RN.get_singleneuron_activity(
-            sna_eachlayer, r, spike, spiking, itter, row_record, col_record)
+            sna_eachlayer, r, itter, row_record, col_record)
     else:
         sna_eachlayer = -999
 
     return r, r_field, r_l, r_u, r_d, r_r, sna_eachlayer
 
-def flow_full_model(GN, x, y, vx, vy, time_ind, a, spike, spiking, r, r_r, r_l, r_d, r_u, r_masks,singleneuronrec, w_r, w_l, w_u, w_d):
+def flow_full_model(GN, vx, vy, time_ind, a, r, r_r, r_l, r_d, r_u, r_masks,singleneuronrec, w_r, w_l, w_u, w_d):
     """ 
     The main funciton of the whole model, taking into account the place cell inputs.
     At each time of the simulation, the place cell activity state is updated and the grid cell activity state is updated based on the current position and velocity.
@@ -209,10 +209,8 @@ def flow_full_model(GN, x, y, vx, vy, time_ind, a, spike, spiking, r, r_r, r_l, 
 
     if singleneuronrec > 0:
         sna_eachlayer = np.zeros((GN.h, 3, time_ind))
-        row_record = np.array([np.floor(np.size(r_field, 1)/2), np.floor(
-            np.size(r_field, 1)/2)-10, np.floor(np.size(r_field, 1)/2)+10], dtype='int')
-        col_record = np.array([np.floor(np.size(r_field, 2)/2), np.floor(
-            np.size(r_field, 2)/2)-10, np.floor(np.size(r_field, 2)/2)+10], dtype='int')
+        row_record = np.array([np.floor(np.size(r_field, 1)/2), np.floor(np.size(r_field, 1)/2)-10, np.floor(np.size(r_field, 1)/2)+10], dtype='int')
+        col_record = np.array([np.floor(np.size(r_field, 2)/2), np.floor(np.size(r_field, 2)/2)-10, np.floor(np.size(r_field, 2)/2)+10], dtype='int')
     else:
         row_record = col_record = sna_eachlayer = -999
 
@@ -221,6 +219,6 @@ def flow_full_model(GN, x, y, vx, vy, time_ind, a, spike, spiking, r, r_r, r_l, 
         vy1 = vy[itter]
         # update neuron activity for grid cells
         [r, r_field, r_l, r_u, r_d, r_r, sna_eachlayer] = update_neuron_activity_with_traj(
-            GN, r, r_r, r_l, r_d, r_u, r_masks, r_fft_plan, r_ifft_plan, vx1, vy1, r_field, spike, spiking, itter, singleneuronrec, time_ind, sna_eachlayer, row_record, col_record,w_r, w_l, w_u, w_d, a)
+            GN, r, r_r, r_l, r_d, r_u, r_masks, r_fft_plan, r_ifft_plan, vx1, vy1, r_field, itter, singleneuronrec, time_ind, sna_eachlayer, row_record, col_record,w_r, w_l, w_u, w_d, a)
 
     return r, r_field, r_r, r_l, r_d, r_u, sna_eachlayer

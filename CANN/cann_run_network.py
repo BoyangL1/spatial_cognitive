@@ -1,6 +1,5 @@
 import numpy as np
 from scipy import stats
-import time
 
 def convolve_no(r_fft_plan, r_ifft_plan, r_dir, w_dir, npad, h):
     """ 
@@ -102,7 +101,7 @@ def update_rate(r, r_field, dt, tau, n, h):
     return r
 
 
-def update_activity_spike(r, r_field, spike, h, n, dt, tau, itter):
+def update_activity_spike(r, r_field, h, n, dt, tau):
     "Update activity if using a spiking based system"
     # Originally 500, but scaling according to new dt/tau (which is essentially dt in this case)
     k = 500.0
@@ -118,31 +117,14 @@ def update_activity_spike(r, r_field, spike, h, n, dt, tau, itter):
 
     activity_mask = (r_field > 0.)*1  # use this to replace if r_field >0 loop
 
-    spike = ((k*dt_inseconds*(r_field*activity_mask - beta_grid)) >
-             threshold)*1  # check if spikes on any neurons on all layers
+    spike = ((k*dt_inseconds*(r_field*activity_mask - beta_grid)) > threshold)*1  # check if spikes on any neurons on all layers
 
-    r = r + (-r + r_field*activity_mask)*dt_tau + alpha * spike
+    r = r + (-r + r_field*activity_mask)*dt_tau + alpha * spike 
 
     return r
 
 
-def update_weights(n_place, h, n, p_activity, r, w_pg, itter):
-    """ 
-    Updates the weights of the place to grid connections
-    """
-    # Parameters
-    lambda_lr = 0.00001  # learning rate
-    epsilon_pg = 0.4
-    r_new_shape = np.repeat(r[np.newaxis, :, :, :], n_place, axis=0)
-    # r_new_shape = np.repeat(r, n_place, 0)
-
-    w_pg += lambda_lr * ((p_activity * r_new_shape) *
-                         (epsilon_pg - w_pg) - r_new_shape*w_pg)
-
-    return w_pg
-
-
-def get_singleneuron_activity(sna_eachlayer, r_field, spike, spiking, itter, row_record, col_record):
+def get_singleneuron_activity(sna_eachlayer, r, itter, row_record, col_record):
     """
     Retrieves and records the activity of single neurons across layers at different time points.
 
@@ -158,8 +140,8 @@ def get_singleneuron_activity(sna_eachlayer, r_field, spike, spiking, itter, row
     Returns:
         The updated slice of the sna_eachlayer array for the specified time point, containing neuronal activity data for that specific moment.
     """
-    sna_eachlayer[:, 0, int(itter)] = r_field[:, row_record[0], col_record[0]]
-    sna_eachlayer[:, 1, int(itter)] = r_field[:, row_record[1], col_record[1]]
-    sna_eachlayer[:, 2, int(itter)] = r_field[:, row_record[2], col_record[2]]
+    sna_eachlayer[:, 0, int(itter)] = r[:, row_record[0], col_record[0]]
+    sna_eachlayer[:, 1, int(itter)] = r[:, row_record[len(row_record)//2], col_record[len(row_record)//2]]
+    sna_eachlayer[:, 2, int(itter)] = r[:, row_record[-1], col_record[-1]]
 
     return sna_eachlayer[:, :, itter]

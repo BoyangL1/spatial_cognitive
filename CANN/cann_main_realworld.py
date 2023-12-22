@@ -19,21 +19,21 @@ if __name__ == "__main__":
     ################ PARAMETERS###################
 
     # Network Basics
-    h = 4  # TODO:Number of grid cell network depths 
-    n = 160  # TODO:number of neurons per side in grid tile,  160 in Louis paper, 128 in Alex's new, 90 in Alex OG TODO:查找文献，选择一个更合理的数字
-    dt = 1.0  # in miliseconds 
-    tau = 10.0  # neuron time constant in ms
+    h = 5  # TODO:Number of grid cell network depths 
+    n = 128  # TODO:number of neurons per side in grid tile,  160 in Louis paper, 128 in Alex's new, 90 in Alex OG TODO:查找文献，选择一个更合理的数字
+    dt = 1.0  # time step, ms
+    tau = 10.0  # neuron time constant, ms
 
     # Recurrent Inhibition Parameters
     wmag = 2.4  
-    lmin = 13  # TODO
-    lmax =  23 # TODO
-    lexp = -1  
+    lmin = 7  # TODO
+    lmax =  13 # TODO
+    lexp = -1 # default to -1  
     wshift = 1
 
     # Coupling Parameters
-    umag = 2.6  # 2.6 for spike model
-    urad = 4.0  # 8.0 for rate model
+    umag = -0.001  # for spike model, mean(w)
+    urad = 4.0  # for rate model
     u_dv = 1  # 1 corresponds to dorsal to ventral
     u_vd = 1  # 1 corresponds to ventral to dorsal
 
@@ -84,7 +84,6 @@ if __name__ == "__main__":
         print('rate coded network')
     else:
         print('spike coded network')
-    spike = 0
 
     GN = UN.GridNeuronNetwork(h,n,dt,tau,0, 0, 0, 0, 0, 0, wmag, lmin,
                             lmax, wshift, umag, urad, u_dv, u_vd, rinit, amag, falloff, falloff_low, falloff_high,npad, rnoise, vgain)
@@ -115,16 +114,16 @@ if __name__ == "__main__":
 
     t0 = time.time()
     [r, r_field, r_r, r_l, r_d, r_u] = UN.flow_neuron_activity(
-        GN,t_index, 0, 0, nflow0, 1, a, spike, spiking, r, r_r, r_l, r_d, r_u, r_masks, singleneuronrec, w_r, w_l, w_u, w_d)
+        GN,t_index, 0, 0, nflow0, 1, a, r, r_r, r_l, r_d, r_u, r_masks, singleneuronrec, w_r, w_l, w_u, w_d)
     # constant velocity
     [r, r_field, r_r, r_l, r_d, r_u] = UN.flow_neuron_activity(
-        GN,t_index,vflow, (np.pi/2 - np.pi/5), nflow1, 2, a, spike, spiking, r, r_r, r_l, r_d, r_u, r_masks, singleneuronrec, w_r, w_l, w_u, w_d)
+        GN,t_index,vflow, (np.pi/2-np.pi/5), nflow1, 2, a, r, r_r, r_l, r_d, r_u, r_masks, singleneuronrec, w_r, w_l, w_u, w_d)
+    
+    [r, r_field, r_r, r_l, r_d, r_u] = UN.flow_neuron_activity(
+        GN,t_index,vflow, (np.pi/5), nflow1, 3, a, r, r_r, r_l, r_d, r_u, r_masks, singleneuronrec, w_r, w_l, w_u, w_d)
 
     [r, r_field, r_r, r_l, r_d, r_u] = UN.flow_neuron_activity(
-        GN,t_index,vflow, (2*np.pi/5), nflow1, 3, a, spike, spiking, r, r_r, r_l, r_d, r_u, r_masks, singleneuronrec, w_r, w_l, w_u, w_d)
-
-    [r, r_field, r_r, r_l, r_d, r_u] = UN.flow_neuron_activity(
-        GN,t_index,vflow, (np.pi/4), nflow1, 4, a, spike, spiking, r, r_r, r_l, r_d, r_u, r_masks, singleneuronrec, w_r, w_l, w_u, w_d)
+        GN,t_index,vflow, (np.pi/4), nflow1, 4, a, r, r_r, r_l, r_d, r_u, r_masks, singleneuronrec, w_r, w_l, w_u, w_d)
     t_run1 = time.time()-t0
     print("Initializing grid cells in 4 phases took {} seconds".format(t_run1))
 
@@ -133,7 +132,7 @@ if __name__ == "__main__":
     status = 'Update Grid Cell Model with Real Trajectory！'
     print(status)
     [r, r_field, r_r, r_l, r_d, r_u, sna_eachlayer] = UN.flow_full_model(
-        GN, x, y, vx, vy, t_index, a, spike, spiking, r, r_r, r_l, r_d, r_u, r_masks,singleneuronrec, w_r, w_l, w_u, w_d)
+        GN, vx, vy, t_index, a, r, r_r, r_l, r_d, r_u, r_masks,singleneuronrec, w_r, w_l, w_u, w_d)
     t_run2 = time.time()-t0
     print("Updating grid cell model with real trajectory took {} seconds".format(t_run2))
 
@@ -141,9 +140,8 @@ if __name__ == "__main__":
     sns_eachlayer = np.zeros((sna_eachlayer.shape))
     print('Calculating single neuron spiking results...')
     for inds in range(0, np.size(sna_eachlayer, 2), 1):
-        sns_eachlayer[:, :, inds] = sna_eachlayer[:, :, inds] > stats.uniform.rvs(
-            0, 1, size=sna_eachlayer[:, :, inds].shape)
-    sns_eachlayer = sns_eachlayer.astype('bool')
+        sns_eachlayer[:, :, inds] = sna_eachlayer[:, :, inds] > stats.uniform.rvs(0, 1, size=sna_eachlayer[:, :, inds].shape) 
+    sns_eachlayer = sns_eachlayer.astype('bool') # [h_grid, num_cell, t_index]
 
     "********************************************************************************************"
     "****************************************Plot Results****************************************"
@@ -151,25 +149,32 @@ if __name__ == "__main__":
     # plot grid cell results
     print('Plotting grid cell results...')
     for z in range(0, h, 1):
-        plt.figure(4)
+        plt.figure()
         plt.imshow(r[z, :, :], cmap='hot')
         plt.savefig(f'./img/grid_cell_result_{z}.png')  # Save the figure
-        plt.show()
 
-    # df = pd.read_csv(file_name)
-    # gdf = gpd.GeoDataFrame(df, geometry=[LineString([(x1, y1), (x2, y2)]) for x1, y1, x2, y2 in zip(df['lambda_o'], df['phi_o'], df['lambda_d'], df['phi_d'])])
+    # plot with real traj
+    df = pd.read_csv(file_name)
+    map_file = "./data/shenzhen_grid/shenzhen_grid.shp"
+    map_gdf = gpd.read_file(map_file)
+    gdf = gpd.GeoDataFrame(df, geometry=[LineString([(x1, y1), (x2, y2)]) for x1, y1, x2, y2 in zip(df['lambda_o'], df['phi_o'], df['lambda_d'], df['phi_d'])])
+    plot_num = 500
+    print('Plotting grid cell results over trajectory...')
+    for z in range(h):
+        for cell_index in range(0, 3, 1):
+            fig, ax = plt.subplots(figsize=(14, 14))
 
-    # # plot single neuron spiking results over whole trajectory
-    # x_ind = np.reshape(x_ind, (x_ind.size, 1))
-    # y_ind = np.reshape(y_ind, (y_ind.size, 1))
-    # print('Plotting grid cell results over trajectory...')
-    # for z in range(0, 3, 1):
-    #     fig,ax = plt.figure(z, figsize=(14, 14))
+            map_gdf.plot(ax=ax, color='lightgrey')  
+            # gdf.plot(ax=ax, edgecolor='blue')
+            
+            # Method 1
+            # colors = ['blue' if val else 'red' for val in sns_eachlayer[z, cell_index, :]]
+            # ax.scatter(x, y, c=colors)
+            
+            # Method 2
+            scatter = ax.scatter(x[:plot_num], y[:plot_num], c=sna_eachlayer[z, cell_index, :plot_num], cmap='viridis', s=5, alpha=0.4)
 
-    #     gdf.plot(ax=ax, edgecolor='blue')
-    #     ax.set_xlabel('Longitude')
-    #     ax.set_ylabel('Latitude')
+            ax.set_xlabel('Longitude')
+            ax.set_ylabel('Latitude')
 
-    #     ax.plot(x_ind[sns_eachlayer[0, z, 0:np.size(x_ind)]]*spatial_scale,
-    #              y_ind[sns_eachlayer[0, z, 0:np.size(x_ind)]]*spatial_scale, 'r.')
-    #     plt.show()
+            plt.savefig(f"./img/cell_{cell_index}_layer_{z}.png")
