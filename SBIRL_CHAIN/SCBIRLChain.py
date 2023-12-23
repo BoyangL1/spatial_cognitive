@@ -511,6 +511,6 @@ if __name__ == "__main__":
     # computeRewardOrValue(model, feature_file, data_dir + 'before_migrt_value.csv', attribute_type='value')
     
     # NOTE: Compute rewards after migration
-    feature_file_all = data_dir + 'all_traj_feature.csv'
-    output_reward_path = data_dir + 'after_migrt_reward.csv'
-    afterMigrt(after_migration_path, before_migration_path, feature_file_all, output_reward_path, model)
+    # feature_file_all = data_dir + 'all_traj_feature.csv'
+    # output_reward_path = data_dir + 'after_migrt_reward.csv'
+    # afterMigrt(after_migration_path, before_migration_path, feature_file_all, output_reward_path, model)
