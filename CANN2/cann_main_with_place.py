@@ -20,7 +20,7 @@ if __name__ == "__main__":
     ################ PARAMETERS###################
 
     # Network Basics
-    h = 2  # TODO:Number of grid cell network depths 
+    h = 8  # TODO:Number of grid cell network depths 
     n = 128  # TODO:number of neurons per side in grid tile,  160 in Louis paper, 128 in Alex's new, 90 in Alex OG TODO:查找文献，选择一个更合理的数字
     dt = 1.0  # time step, ms
     tau = 10.0  # neuron time constant, ms
@@ -28,7 +28,7 @@ if __name__ == "__main__":
     # Recurrent Inhibition Parameters
     wmag = 2.4  
     lmin = 7  # TODO
-    lmax =  13 # TODO
+    lmax = 41 # TODO
     lexp = -1 # default to -1  
     wshift = 1
 

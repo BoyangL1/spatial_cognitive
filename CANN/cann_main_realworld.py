@@ -5,9 +5,10 @@ import matplotlib.pyplot as plt
 import cann_update_network as UN
 import cann_setup_network as SN
 import pandas as pd
-import geopandas as gpd
-from shapely.geometry import LineString
+# import geopandas as gpd
+# from shapely.geometry import LineString
 import real_trajeccotry as TRAJ
+import pickle
 
 np.random.seed(1)
 UNDEF = -999
@@ -19,7 +20,7 @@ if __name__ == "__main__":
     ################ PARAMETERS###################
 
     # Network Basics
-    h = 5  # TODO:Number of grid cell network depths 
+    h = 8  # TODO:Number of grid cell network depths 
     n = 128  # TODO:number of neurons per side in grid tile,  160 in Louis paper, 128 in Alex's new, 90 in Alex OG TODO:查找文献，选择一个更合理的数字
     dt = 1.0  # time step, ms
     tau = 10.0  # neuron time constant, ms
@@ -27,7 +28,7 @@ if __name__ == "__main__":
     # Recurrent Inhibition Parameters
     wmag = 2.4  
     lmin = 7  # TODO
-    lmax =  13 # TODO
+    lmax =  41 # TODO
     lexp = -1 # default to -1  
     wshift = 1
 
@@ -90,7 +91,11 @@ if __name__ == "__main__":
     
     file_name = './data/one_travel_chain_time.csv'
     # Get Trajectory Data
-    [x,y,vx,vy,spatial_scale] = TRAJ.get_trajectory(file_name)
+    [origin_x,origin_y,dest_x,dest_y,x,y,vx,vy,spatial_scale] = TRAJ.get_trajectory(file_name)
+    anchor_x = origin_x + dest_x
+    anchor_y = origin_y + dest_y
+    # anchor_x, anchor_y = anchor_x[:10], anchor_y[:10]
+    anchor_set = set(zip(anchor_x, anchor_y))
 
     "*******************************************************************"
     "***************Run Network Setup***********************************"
@@ -131,8 +136,8 @@ if __name__ == "__main__":
     t0 = time.time()
     status = 'Update Grid Cell Model with Real Trajectory！'
     print(status)
-    [r, r_field, r_r, r_l, r_d, r_u, sna_eachlayer] = UN.flow_full_model(
-        GN, vx, vy, t_index, a, r, r_r, r_l, r_d, r_u, r_masks,singleneuronrec, w_r, w_l, w_u, w_d)
+    [r, r_field, r_r, r_l, r_d, r_u, sna_eachlayer, place_grid_dic] = UN.flow_full_model(
+        GN, anchor_set,x,y,vx, vy, t_index, a, r, r_r, r_l, r_d, r_u, r_masks,singleneuronrec, w_r, w_l, w_u, w_d)
     t_run2 = time.time()-t0
     print("Updating grid cell model with real trajectory took {} seconds".format(t_run2))
 
@@ -146,6 +151,10 @@ if __name__ == "__main__":
     "********************************************************************************************"
     "****************************************Plot Results****************************************"
     "********************************************************************************************"
+    print("Saving places cell corresponding grid cell networks")
+    with open('./data/place_grid_data.pkl', 'wb') as file:
+        pickle.dump(place_grid_dic, file)
+
     # plot grid cell results
     print('Plotting grid cell results...')
     for z in range(0, h, 1):
@@ -153,28 +162,28 @@ if __name__ == "__main__":
         plt.imshow(r[z, :, :], cmap='hot')
         plt.savefig(f'./img/grid_cell_result_{z}.png')  
 
-    # plot with real traj
-    df = pd.read_csv(file_name)
-    map_file = "./data/shenzhen_grid/shenzhen_grid.shp"
-    map_gdf = gpd.read_file(map_file)
-    gdf = gpd.GeoDataFrame(df, geometry=[LineString([(x1, y1), (x2, y2)]) for x1, y1, x2, y2 in zip(df['lambda_o'], df['phi_o'], df['lambda_d'], df['phi_d'])])
-    plot_num = 500
-    print('Plotting grid cell results over trajectory...')
-    for z in range(h):
-        for cell_index in range(0, 3, 1):
-            fig, ax = plt.subplots(figsize=(14, 14))
+    # # plot with real traj
+    # df = pd.read_csv(file_name)
+    # map_file = "./data/shenzhen_grid/shenzhen_grid.shp"
+    # map_gdf = gpd.read_file(map_file)
+    # gdf = gpd.GeoDataFrame(df, geometry=[LineString([(x1, y1), (x2, y2)]) for x1, y1, x2, y2 in zip(df['lambda_o'], df['phi_o'], df['lambda_d'], df['phi_d'])])
+    # plot_num = 500
+    # print('Plotting grid cell results over trajectory...')
+    # for z in range(h):
+    #     for cell_index in range(0, 3, 1):
+    #         fig, ax = plt.subplots(figsize=(14, 14))
 
-            map_gdf.plot(ax=ax, color='lightgrey')  
-            # gdf.plot(ax=ax, edgecolor='blue')
+    #         map_gdf.plot(ax=ax, color='lightgrey')  
+    #         # gdf.plot(ax=ax, edgecolor='blue')
             
-            # Method 1
-            # colors = ['blue' if val else 'red' for val in sns_eachlayer[z, cell_index, :plot_num]]
-            # ax.scatter(x, y, c=colors)
+    #         # Method 1
+    #         # colors = ['blue' if val else 'red' for val in sns_eachlayer[z, cell_index, :plot_num]]
+    #         # ax.scatter(x, y, c=colors)
             
-            # Method 2
-            scatter = ax.scatter(x[:plot_num], y[:plot_num], c=sna_eachlayer[z, cell_index, :plot_num], cmap='viridis', s=5, alpha=0.4)
+    #         # Method 2
+    #         scatter = ax.scatter(x[:plot_num], y[:plot_num], c=sna_eachlayer[z, cell_index, :plot_num], cmap='viridis', s=5, alpha=0.4)
 
-            ax.set_xlabel('Longitude')
-            ax.set_ylabel('Latitude')
+    #         ax.set_xlabel('Longitude')
+    #         ax.set_ylabel('Latitude')
 
-            plt.savefig(f"./img/cell_{cell_index}_layer_{z}.png",dpi=600)
+    #         plt.savefig(f"./img/cell_{cell_index}_layer_{z}.png",dpi=600)
