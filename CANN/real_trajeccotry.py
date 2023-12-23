@@ -92,4 +92,4 @@ def get_trajectory(file_name):
     
     result_df.to_csv('./data/one_grid_lat_lon.csv',index=False)
     
-    return df.lambda_o.tolist(),df.phi_o.tolist(),df.lambda_d.tolist(),df.phi_d.tolist(),result_df.lambda_o.tolist(), result_df.phi_o.tolist(), result_df.vx.tolist(), result_df.vy.tolist(),spatial_scale
+    return df.grid_id_o.tolist(),df.grid_id_d.tolist(),df.lambda_o.tolist(),df.phi_o.tolist(),df.lambda_d.tolist(),df.phi_d.tolist(),result_df.lambda_o.tolist(), result_df.phi_o.tolist(), result_df.vx.tolist(), result_df.vy.tolist(),spatial_scale
