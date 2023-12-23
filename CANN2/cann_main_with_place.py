@@ -7,8 +7,6 @@ import cann_setup_network as SN
 from place_cell import PlaceCell
 import place_cell_utilities as PCU
 import pandas as pd
-import geopandas as gpd
-from shapely.geometry import LineString
 import real_trajeccotry as TRAJ
 import pickle
 
@@ -134,6 +132,16 @@ if __name__ == "__main__":
     t0 = time.time()
     [r, r_field, r_r, r_l, r_d, r_u] = UN.flow_neuron_activity(
         GN,t_index, 0, 0, nflow0, 1, a, r, r_r, r_l, r_d, r_u, r_masks, singleneuronrec, w_r, w_l, w_u, w_d)    
+    
+    # constant velocity
+    [r, r_field, r_r, r_l, r_d, r_u] = UN.flow_neuron_activity(
+        GN,t_index,vflow, (np.pi/2-np.pi/5), nflow1, 2, a, r, r_r, r_l, r_d, r_u, r_masks, singleneuronrec, w_r, w_l, w_u, w_d)
+    
+    [r, r_field, r_r, r_l, r_d, r_u] = UN.flow_neuron_activity(
+        GN,t_index,vflow, (np.pi/5), nflow1, 3, a, r, r_r, r_l, r_d, r_u, r_masks, singleneuronrec, w_r, w_l, w_u, w_d)
+
+    [r, r_field, r_r, r_l, r_d, r_u] = UN.flow_neuron_activity(
+        GN,t_index,vflow, (np.pi/4), nflow1, 4, a, r, r_r, r_l, r_d, r_u, r_masks, singleneuronrec, w_r, w_l, w_u, w_d)
     t_run1 = time.time()-t0
     print("Initializing grid cells took {} seconds".format(t_run1))
 
