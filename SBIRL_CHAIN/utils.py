@@ -39,14 +39,16 @@ def preprocessStateAttributes(traj_file,all_feature_path = './data/all_traj_feat
 def processTrajectoryData(traj_chains, state_attribute, s_dim):
     state_next_state = []
     action_next_action = []
+    destination_grid = []
 
     for tc in traj_chains:
         for t in range(len(tc.travel_chain) - 1):
             s_n_s, a_n_a = processSingleTrajectory(tc, t, state_attribute, s_dim)
             state_next_state.append(s_n_s)
             action_next_action.append(a_n_a)
+            destination_grid.append(tc.travel_chain[-1])
 
-    return onp.array(state_next_state), onp.array(action_next_action)
+    return onp.array(state_next_state), onp.array(action_next_action),destination_grid
 
 def processSingleTrajectory(tc, t, state_attribute, s_dim):
     s_n_s = onp.zeros((2, s_dim))
@@ -74,13 +76,12 @@ def loadTrajChain(traj_file, full_traj_path, num_trajs=None):
         traj_chains = traj_chains[:num_trajs]
 
     state_attribute, s_dim = preprocessStateAttributes(traj_file)
-    state_next_state, action_next_action = processTrajectoryData(traj_chains, state_attribute, s_dim)
+    state_next_state, action_next_action,destination_grid = processTrajectoryData(traj_chains, state_attribute, s_dim)
 
-    return state_next_state[:,:,:-1], state_next_state[:,:,-1], action_next_action, a_dim, s_dim
+    return state_next_state[:,:,:-1], state_next_state[:,:,-1],  action_next_action, destination_grid, a_dim, s_dim
     
 if __name__ == "__main__":
     path = f'./data/before_migrt.json'
     full_traj_path = f'./data/all_traj.json'
-    inputs, cost, targets, a_dim, s_dim =loadTrajChain(path,full_traj_path)
-    # print(inputs.shape,targets.shape,a_dim,s_dim)
-    print(inputs.shape, cost.shape)
+    inputs, cost, targets, destination_grid, a_dim, s_dim =loadTrajChain(path,full_traj_path)
+    print(len(destination_grid),inputs.shape)

@@ -501,9 +501,9 @@ if __name__ == "__main__":
     model = avril(inputs, cost, targets, state_dim, action_dim, state_only=True)
 
     # NOTE: train the model
-    # model.train(iters=50000)
-    # model_save_path = model_dir + 'params.pickle'
-    # model.modelSave(model_save_path)
+    model.train(iters=50000)
+    model_save_path = model_dir + 'params.pickle'
+    model.modelSave(model_save_path)
     
     # NOTE: compute rewards and values before migration
     # feature_file = data_dir + 'before_migrt_feature.csv'
