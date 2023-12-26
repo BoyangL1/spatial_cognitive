@@ -16,6 +16,10 @@ def loadJsonFile(file_path):
 def loadTravelDataFromDicts(data_dicts):
     return [TravelData(**d) for d in data_dicts]
 
+def getStateRow(state_attribute, state):
+    row = state_attribute[state_attribute['fnid'] == state]
+    return np.array(row.values[0][1:])
+
 def getActionDim(all_chains):
     """ 
     Calculate the dimension of the action space for a travel chain. 
@@ -23,8 +27,23 @@ def getActionDim(all_chains):
     """
     return max({id for tc in all_chains for id in tc.id_chain}) + 2 # id_chain is a sequence, so the length = max +1 +1
 
-def preprocessStateAttributes(traj_file,all_feature_path = './data/all_traj_feature.csv'):
+def preprocessStateAttributes(traj_file, all_feature_path='./data/all_traj_feature.csv'):
+    """
+    Preprocess state attributes from a trajectory file.
+
+    This function reads state attributes from a CSV file, adjusts the columns based on the trajectory file provided,
+    and scales the features using MinMaxScaler.
+
+    Args:
+        traj_file (str): Path to the trajectory file.
+        all_feature_path (str, optional): Path to the CSV file containing all trajectory features. 
+
+    Returns:
+        tuple: A tuple containing the preprocessed DataFrame and the dimension of state attributes (excluding 'fnid').
+    """
     state_attribute = pd.read_csv(all_feature_path)
+
+    # Adjust columns based on the trajectory file
     if traj_file == './data/before_migrt.json':
         state_attribute.drop(columns=['post_home_distance'], inplace=True)
         state_attribute.rename(columns={'pre_home_distance': 'home_distance'}, inplace=True)
@@ -32,29 +51,53 @@ def preprocessStateAttributes(traj_file,all_feature_path = './data/all_traj_feat
         state_attribute.drop(columns=['pre_home_distance'], inplace=True)
         state_attribute.rename(columns={'post_home_distance': 'home_distance'}, inplace=True)
 
+    # Calculate the dimension of state attributes (excluding 'fnid')
     s_dim = state_attribute.shape[1] - 1
+
+    # Separate 'fnid' column and other columns
     fnid_col = state_attribute[['fnid']]
     other_cols = state_attribute.drop(columns=['fnid'])
 
+    # Scale the features using MinMaxScaler
     scaler = MinMaxScaler()
     scaled_cols = scaler.fit_transform(other_cols)
+
+    # Create a DataFrame from the scaled features
     scaled_df = pd.DataFrame(scaled_cols, columns=other_cols.columns)
+
+    # Return the combined DataFrame and the dimension of state attributes
     return pd.concat([fnid_col, scaled_df], axis=1), s_dim
 
 def processTrajectoryData(traj_chains, state_attribute, s_dim, place_grid_data):
+    """
+    Process trajectory data to generate sequences of states, actions, and grids.This function iterates through trajectory chains and processes each trajectory to generate sequences of
+    state-next_state, action-next_action, and grid-next_grid pairs.
+
+    Args:
+        traj_chains (list): List of trajectory chain objects.
+        state_attribute (DataFrame): DataFrame containing state attributes.
+        s_dim (int): The dimension of state attributes.
+        place_grid_data (Dict): Dict containing place grid data.
+
+    Returns:
+        tuple: A tuple containing arrays of state-next_state pairs, action-next_action pairs, and grid-next_grid pairs.
+    """
     state_next_state = []
     action_next_action = []
     grid_next_grid = []
 
     for tc in traj_chains:
         for t in range(len(tc.travel_chain)):
+            # Get the final destination in the travel chain
             destination = tc.travel_chain[-1]
-            s_n_s, a_n_a,s_grid_s = processSingleTrajectory(tc, t, state_attribute, s_dim, destination,place_grid_data)
+            s_n_s, a_n_a, s_grid_s = processSingleTrajectory(tc, t, state_attribute, s_dim, destination, place_grid_data)
+            # Append the results to respective lists
             state_next_state.append(s_n_s)
             action_next_action.append(a_n_a)
             grid_next_grid.append(s_grid_s)
 
-    return onp.array(state_next_state), onp.array(action_next_action), onp.array(grid_next_grid)
+    return np.array(state_next_state), np.array(action_next_action), np.array(grid_next_grid)
+
 
 def processSingleTrajectory(tc, t, state_attribute, s_dim, destination, place_grid_data):
     if t < len(tc.travel_chain)-1:
@@ -103,10 +146,6 @@ def processSingleTrajectory(tc, t, state_attribute, s_dim, destination, place_gr
         a_n_a[1] = -1
 
     return s_n_s, a_n_a,s_gird_s
-
-def getStateRow(state_attribute, state):
-    row = state_attribute[state_attribute['fnid'] == state]
-    return np.array(row.values[0][1:])
 
 def loadTrajChain(traj_file, full_traj_path, place_grid_data,num_trajs=None):
     loaded_dicts_list1 = loadJsonFile(traj_file)
