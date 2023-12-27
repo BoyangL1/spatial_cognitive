@@ -68,14 +68,14 @@ def preprocessStateAttributes(traj_file, all_feature_path='./data/all_traj_featu
     # Return the combined DataFrame and the dimension of state attributes
     return pd.concat([fnid_col, scaled_df], axis=1), s_dim
 
-def padSequences(data_list, element_shape, padding_value=0):
+def padSequences(data_list, element_shape, padding_value=float('-inf')):
     """
     Pad lists of variable lengths containing elements of a specific shape.
 
     Args:
         data_list (list of lists): List of lists containing elements of varying lengths.
         element_shape (tuple): The shape of the elements in the inner lists.
-        padding_value (int, optional): The value to use for padding. Defaults to 0.
+        padding_value (int, optional): The value to use for padding. Defaults to float('-inf').
 
     Returns:
         numpy array: Padded data_list.
