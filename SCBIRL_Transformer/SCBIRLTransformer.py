@@ -46,9 +46,10 @@ def q_network_model(inputs, enc_output, grid_code, num_layers, num_heads, dff, r
     # Initialize transformer decoder layer
     transformer_decoder_layers = [TransformerDecoderLayer(inputs.shape[-1], num_heads, dff, rate) for _ in range(num_layers)]
     
+    lood_ahead_mask = create_look_ahead_mask(inputs.shape[1]*inputs.shape[2])
     # forward function
     for layer in transformer_decoder_layers:
-        inputs = layer(inputs, enc_output, None, None, rng)  # assuming look_ahead_mask and padding_mask are None
+        inputs = layer(inputs, enc_output, lood_ahead_mask, None, rng)
 
     final_layer = hk.Linear(output_dim)
     return final_layer(inputs)
