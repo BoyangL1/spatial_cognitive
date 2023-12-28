@@ -328,7 +328,7 @@ class avril:
 
         return neg_log_lik + kl + lambda_value*irl_loss
     
-    def train(self, iters: int = 1000, batch_size: int = 64, l_rate: float = 1e-4):
+    def train(self, iters: int = 1000, batch_size: int = 64, l_rate: float = 1e-4, loss_threshold: float = 0.01):
         """
         Training function for the model.
 
@@ -374,6 +374,10 @@ class avril:
             key, subkey = random.split(key)
 
             lik, g_params = loss_grad(params, key, inputs[indexs], targets[indexs], grid_code[indexs])
+
+            if lik < loss_threshold:
+                print(f"Training stopped at iteration {itr} as loss {lik} is below the threshold {loss_threshold}")
+                break
 
             param_state = update_fun(itr, g_params, param_state)
 
@@ -630,7 +634,7 @@ def afterMigrt(afterMigrtFile, beforeMigrtFile, full_trajectory_path, place_grid
         rewardValues = processAfterMigrationData(tc, stateAttribute, place_grid_data, model, visitedState, idFnid, actionDim)
 
         # Train the model.
-        model.train(iters=500)
+        model.train(iters=50000)
 
         # Save the current model state.
         modelSavePath = "./data/after_migrt/model/" + str(tc.date) + ".pickle"
@@ -662,14 +666,14 @@ if __name__=="__main__":
     model = avril(inputs, targets_action, grid_code, state_dim, action_dim, state_only=True)
 
     # NOTE: train the model
-    # model.train(iters=500)
-    # model_save_path = model_dir + 'params_transformer.pickle'
-    # model.modelSave(model_save_path)
+    model.train(iters=50000)
+    model_save_path = model_dir + 'params_transformer.pickle'
+    model.modelSave(model_save_path)
 
     # NOTE: compute rewards and values before migration
-    # feature_file = data_dir + 'before_migrt_feature.csv'
-    # computeRewardOrValue(model, feature_file, data_dir + 'before_migrt_reward.csv', place_grid_data, attribute_type='reward')
-    # computeRewardOrValue(model, feature_file, data_dir + 'before_migrt_value.csv', place_grid_data, attribute_type='value')
+    feature_file = data_dir + 'before_migrt_feature.csv'
+    computeRewardOrValue(model, feature_file, data_dir + 'before_migrt_reward.csv', place_grid_data, attribute_type='reward')
+    computeRewardOrValue(model, feature_file, data_dir + 'before_migrt_value.csv', place_grid_data, attribute_type='value')
 
     # NOTE: Compute rewards after migration
     feature_file_all = data_dir + 'all_traj_feature.csv'

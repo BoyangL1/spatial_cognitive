@@ -362,7 +362,7 @@ class avril:
             self.load_params = True
             self.pre_params = self.params
 
-    def train(self, iters: int = 1000, batch_size: int = 64, l_rate: float = 1e-4):
+    def train(self, iters: int = 1000, batch_size: int = 64, l_rate: float = 1e-4, loss_threshold: float = 0.01):
         """
         Training function for the model.
 
@@ -408,6 +408,10 @@ class avril:
             key, subkey = random.split(key)
 
             lik, g_params = loss_grad(params, key, inputs[indexs], targets[indexs], grid_code[indexs])
+
+            if lik < loss_threshold:
+                print(f"Training stopped at iteration {itr} as loss {lik} is below the threshold {loss_threshold}")
+                break
 
             param_state = update_fun(itr, g_params, param_state)
 
@@ -699,9 +703,9 @@ if __name__ == "__main__":
     model = avril(inputs, targets_action, grid_code, state_dim, action_dim, state_only=True)
 
     # NOTE: train the model
-    # model.train(iters=50000)
-    # model_save_path = model_dir + 'params.pickle'
-    # model.modelSave(model_save_path)
+    model.train(iters=50000)
+    model_save_path = model_dir + 'params.pickle'
+    model.modelSave(model_save_path)
     
     # NOTE: compute rewards and values before migration
     # feature_file = data_dir + 'before_migrt_feature.csv'
@@ -709,6 +713,6 @@ if __name__ == "__main__":
     # computeRewardOrValue(model, feature_file, data_dir + 'before_migrt_reward.csv', place_grid_data, attribute_type='reward')
     
     # NOTE: Compute rewards after migration
-    feature_file_all = data_dir + 'all_traj_feature.csv'
-    output_reward_path = data_dir + 'after_migrt_reward.csv'
-    afterMigrt(after_migration_path, before_migration_path, full_trajectory_path, place_grid_data, feature_file_all, output_reward_path, model)
+    # feature_file_all = data_dir + 'all_traj_feature.csv'
+    # output_reward_path = data_dir + 'after_migrt_reward.csv'
+    # afterMigrt(after_migration_path, before_migration_path, full_trajectory_path, place_grid_data, feature_file_all, output_reward_path, model)
