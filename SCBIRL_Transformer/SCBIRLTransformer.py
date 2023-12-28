@@ -161,6 +161,56 @@ class avril:
             self.load_params = True
             self.pre_params = self.params
 
+    def reward(self,state,grid_code):
+        #  Returns reward function parameters for a given state
+        r_par = self.encoder.apply(
+                self.e_params,
+                self.key,
+                state,
+                grid_code,
+                self.num_layers,
+                self.num_heads,
+                self.dff,
+                self.rate,
+                self.encoder_o_dim,
+                self.key,
+                self.cnn_output
+            )
+        r_par = np.squeeze(r_par,axis = 2)
+        return r_par
+    
+    def QValue(self,state,grid_code):
+        enc_output = self.encoder.apply(
+                self.e_params,
+                self.key,
+                state,
+                grid_code,
+                self.num_layers,
+                self.num_heads,
+                self.dff,
+                self.rate,
+                self.encoder_o_dim,
+                self.key,
+                self.cnn_output
+            )
+        
+        q_values = self.q_network.apply(
+            self.q_params,
+            self.key,
+            state,
+            enc_output,
+            grid_code,
+            self.num_layers,
+            self.num_heads,
+            self.dff,
+            self.rate,
+            self.a_dim,
+            self.key,
+            self.cnn_output
+        )
+        q_values = np.squeeze(q_values,axis=2)
+        return q_values
+
     def elbo(self, params, key, inputs, targets, grid_code):
         """
         Method for calculating ELBO
@@ -333,6 +383,57 @@ class avril:
         self.q_params = params[1]
         self.params = params
 
+def computeRewardOrValue(model, input_path, output_path, place_grid_data, attribute_type='value'):
+    """
+    Compute rewards or state values for each state using a given model and save to a CSV file.
+
+    Parameters:
+    - model: The trained model. Should have a method `rewardValue` for computing rewards and `QValue` for computing Q values.
+    - input_path (str): Path to the input CSV file containing states.
+    - output_path (str): Path to save the output CSV file with computed attributes (rewards or state values).
+    - attribute_type (str): Either 'value' to compute state values or 'reward' to compute rewards.
+
+    Returns:
+    None. Writes results to the specified output CSV file.
+    """
+    
+    # Using preprocessing function from utils
+    state_attribute, _ = preprocessStateAttributes('./data/before_migrt.json',input_path)
+
+    # Add a column for attribute_type
+    state_attribute[attribute_type] = 0.0
+
+    computeFunc = getComputeFunction(model, attribute_type)
+    
+    for index, row in tqdm(state_attribute.iterrows(), total=len(state_attribute)):
+        # get grid code of this fnid
+        fnid = row.fnid
+        this_fnid_grid = place_grid_data[fnid]
+        destination_grid = np.zeros_like(this_fnid_grid) # if has specific destination, change this line to real destination grid code
+        grid_code = onp.concatenate((this_fnid_grid, destination_grid), axis=0)
+        # get state attribute of this fnid
+        state = np.array(row.values[1:-1])
+
+        # add three dimension
+        grid_code = np.expand_dims(np.expand_dims(np.expand_dims(grid_code, axis=0), axis=0), axis = 0)
+        state = np.expand_dims(np.expand_dims(np.expand_dims(state, axis=0), axis=0), axis = 0)
+        # change state attribute and gird code to 
+        a = computeFunc(state,grid_code)
+        state_attribute.iloc[index, -1] = float(computeFunc(state,grid_code))
+        
+    if output_path is not None:
+        state_attribute.to_csv(output_path, index=False)
+    return
+
+def getComputeFunction(model, attribute_type):
+    """Return the appropriate function to compute either 'value' or 'reward'."""
+    if attribute_type == 'value':
+        return lambda state,grid_code: np.max(model.QValue(state,grid_code))
+    elif attribute_type == 'reward':
+        return lambda state,grid_code: model.reward(state,grid_code)[0][0][0] # (1,1,2)
+    else:
+        raise ValueError("attribute_type should be either 'value' or 'reward'.")
+    
 if __name__=="__main__":
     data_dir = './data/'
     model_dir = './model/'
@@ -351,6 +452,11 @@ if __name__=="__main__":
     model = avril(inputs, targets_action, grid_code, state_dim, action_dim, state_only=True)
 
     # NOTE: train the model
-    model.train(iters=500)
-    model_save_path = model_dir + 'params_transformer.pickle'
-    model.modelSave(model_save_path)
+    # model.train(iters=500)
+    # model_save_path = model_dir + 'params_transformer.pickle'
+    # model.modelSave(model_save_path)
+
+    # NOTE: compute rewards and values before migration
+    feature_file = data_dir + 'before_migrt_feature.csv'
+    computeRewardOrValue(model, feature_file, data_dir + 'before_migrt_reward.csv', place_grid_data, attribute_type='reward')
+    computeRewardOrValue(model, feature_file, data_dir + 'before_migrt_value.csv', place_grid_data, attribute_type='value')
