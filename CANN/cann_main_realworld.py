@@ -21,7 +21,7 @@ if __name__ == "__main__":
 
     # Network Basics
     h = 8  # TODO:Number of grid cell network depths 
-    n = 128  # TODO:number of neurons per side in grid tile,  160 in Louis paper, 128 in Alex's new, 90 in Alex OG TODO:查找文献，选择一个更合理的数字
+    n = 128  # TODO:number of neurons per side in grid tile,  160 in Louis paper, 128 in Alex's new, 90 in Alex OG
     dt = 1.0  # time step, ms
     tau = 10.0  # neuron time constant, ms
 
@@ -94,9 +94,14 @@ if __name__ == "__main__":
     [origin_grid,dest_grid,origin_x,origin_y,dest_x,dest_y,x,y,vx,vy,spatial_scale] = TRAJ.get_trajectory(file_name)
     anchor_x = origin_x + dest_x
     anchor_y = origin_y + dest_y
-    # anchor_x, anchor_y = anchor_x[:10], anchor_y[:10]
-    anchor_list = list(zip(anchor_x, anchor_y))
-    grid_list = origin_grid+dest_grid
+    grid_list = origin_grid + dest_grid
+    # de-duplicate
+    unique_dict = {}
+    for ax, ay, grid in zip(anchor_x, anchor_y, grid_list):
+        unique_dict[(ax, ay)] = grid
+
+    anchor_list = list(unique_dict.keys())
+    grid_list = list(unique_dict.values())
 
     "*******************************************************************"
     "***************Run Network Setup***********************************"
