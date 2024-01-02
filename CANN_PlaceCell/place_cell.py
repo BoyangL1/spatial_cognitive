@@ -20,9 +20,9 @@ class PlaceCell:
         max_val = 1/(2*np.pi*self.sigma**2)
         # normalize to between 0 and 1 - based on sigma=5.0
         curr_place_val = (curr_place_val / max_val)
-        # normalize to between 0 and 0.1 - based on equation from Alex's model
+        # normalize to between 0 and 0.1 
         curr_place_val = 0.1 * curr_place_val
-        # normalize to 500 * dt/tau * activ_level - output is Hz
+        # normalize to 500 * dt/tau * activ_level, output is Hz
         curr_place_val = curr_place_val * 500 * (1.0/10.0)
         # check if cell does spike
         if (curr_place_val >= rand_val):

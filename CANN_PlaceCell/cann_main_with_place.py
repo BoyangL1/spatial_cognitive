@@ -91,11 +91,11 @@ if __name__ == "__main__":
     [origin_x,origin_y,dest_x,dest_y,x,y,vx,vy,spatial_scale] = TRAJ.get_trajectory(file_name)
     anchor_x = origin_x + dest_x
     anchor_y = origin_y + dest_y
-    # anchor_x, anchor_y = anchor_x[:10], anchor_y[:10]
-    anchor_set = set(zip(anchor_x, anchor_y))
+    anchor_list = list(set(zip(anchor_x, anchor_y)))
+    anchor_x, anchor_y = zip(*anchor_list)
 
     # Place_cell_parameters
-    n_place_cells = len(anchor_x)
+    n_place_cells = len(anchor_list)
     sigma = 0.01
     rand_weights_max = 0.00222
 
@@ -117,7 +117,7 @@ if __name__ == "__main__":
     w_pg = SN.setup_pg(h, n, n_place_cells, rand_weights_max) # [n_place,h_grid,n_grid,n_grid]
 
     ############################ PLACE CELL SETUP ##########################
-    place_cells = PCU.create_place_cells(n_place_cells, anchor_x, anchor_y,sigma)
+    place_cells = PCU.create_place_cells(n_place_cells, anchor_x, anchor_y, sigma)
     place_cell_spiking, place_activity = np.zeros((n_place_cells, len(x))), np.zeros((n_place_cells, len(x)))
     # PCU.plot_centers(place_cells,'./img/palce_cell.png')
 
@@ -150,7 +150,7 @@ if __name__ == "__main__":
     status = 'Running Model with Trajectory and Place Cells'
     print(status)
     [r, r_field, r_r, r_l, r_d, r_u, sna_eachlayer, w_pg, place_grid_dic] = UN.flow_full_model(
-        GN, anchor_set,x, y, vx, vy, t_index, a, r, r_r, r_l, r_d, r_u, r_masks,singleneuronrec, place_cell_spiking, place_activity, w_pg, place_cells, n_place_cells,w_r, w_l, w_u, w_d)
+        GN, anchor_list,x, y, vx, vy, t_index, a, r, r_r, r_l, r_d, r_u, r_masks,singleneuronrec, place_cell_spiking, place_activity, w_pg, place_cells, n_place_cells,w_r, w_l, w_u, w_d)
     t_run2 = time.time()-t0
     print("Running grid cells with anchor point and real trajectory took {} seconds".format(t_run2))
 

@@ -197,7 +197,7 @@ def update_neuron_activity_with_place(GN,r, r_r, r_l, r_d, r_u, r_masks,r_fft_pl
 
     return r, r_field, r_l, r_u, r_d, r_r, sna_eachlayer, w_pg
 
-def flow_full_model(GN, anchor_set,x, y, vx, vy, time_ind, a, r, r_r, r_l, r_d, r_u, r_masks,singleneuronrec,place_cell_spiking, place_activity, w_pg, place_cells, n_place_cells, w_r, w_l, w_u, w_d):
+def flow_full_model(GN, anchor_list ,x, y, vx, vy, time_ind, a, r, r_r, r_l, r_d, r_u, r_masks,singleneuronrec,place_cell_spiking, place_activity, w_pg, place_cells, n_place_cells, w_r, w_l, w_u, w_d):
     """ 
     The main funciton of the whole model, taking into account the place cell inputs.
     At each time of the simulation, the place cell activity state is updated and the grid cell activity state is updated based on the current position and velocity.
@@ -232,7 +232,7 @@ def flow_full_model(GN, anchor_set,x, y, vx, vy, time_ind, a, r, r_r, r_l, r_d, 
         [r, r_field, r_l, r_u, r_d, r_r, sna_eachlayer, w_pg] = update_neuron_activity_with_place(
             GN, r, r_r, r_l, r_d, r_u, r_masks, r_fft_plan, r_ifft_plan, vx1, vy1, r_field, itter, singleneuronrec, time_ind, sna_eachlayer, row_record, col_record, curr_place_activity, w_r, w_l, w_u, w_d, a, w_pg, n_place_cells)
         # save anchor points and their attached grid cells network
-        if (x[itter],y[itter]) in anchor_set:
+        if (x[itter],y[itter]) in anchor_list:
             place_grid_dic[(x[itter], y[itter])] = r
 
     return r, r_field, r_r, r_l, r_d, r_u, sna_eachlayer,w_pg, place_grid_dic
