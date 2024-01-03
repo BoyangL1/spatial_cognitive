@@ -224,6 +224,6 @@ def flow_full_model(GN, anchor_list, grid_list, x,y,vx, vy, time_ind, a, r, r_r,
         if (x[itter],y[itter]) in anchor_list:
             # index = anchor_list.index((x[itter], y[itter]))
             # grid_id = grid_list[index]
-            place_grid_dic[(x[itter],y[itter])] = r
+            place_grid_dic[[x[itter],y[itter]]] = r
 
     return r, r_field, r_r, r_l, r_d, r_u, sna_eachlayer, place_grid_dic
