@@ -89,7 +89,7 @@ if __name__ == "__main__":
     GN = UN.GridNeuronNetwork(h,n,dt,tau,0, 0, 0, 0, 0, 0, wmag, lmin,
                             lmax, wshift, umag, urad, u_dv, u_vd, rinit, amag, falloff, falloff_low, falloff_high,npad, rnoise, vgain)
     
-    file_name = './data/one_travel_chain_time.csv'
+    file_name = './data/one_travel_chain.csv'
     # Get Trajectory Data
     [origin_grid,dest_grid,origin_x,origin_y,dest_x,dest_y,x,y,vx,vy,spatial_scale] = TRAJ.get_trajectory(file_name)
     anchor_x = origin_x + dest_x
@@ -140,7 +140,7 @@ if __name__ == "__main__":
 
     singleneuronrec = True
     t0 = time.time()
-    status = 'Update Grid Cell Model with Real Trajectory！'
+    status = 'Update Grid Cell Model with Real Trajectory!'
     print(status)
     [r, r_field, r_r, r_l, r_d, r_u, sna_eachlayer, place_grid_dic] = UN.flow_full_model(
         GN, anchor_list,grid_list,x,y,vx, vy, t_index, a, r, r_r, r_l, r_d, r_u, r_masks,singleneuronrec, w_r, w_l, w_u, w_d)
