@@ -161,12 +161,12 @@ if __name__ == "__main__":
     with open('./data/place_grid_data.pkl', 'wb') as file:
         pickle.dump(place_grid_dic, file)
 
-    # plot grid cell results
-    print('Plotting grid cell results...')
-    for z in range(0, h, 1):
-        plt.figure()
-        plt.imshow(r[z, :, :], cmap='hot')
-        plt.savefig(f'./img/grid_cell_result_{z}.png')  
+    # # plot grid cell results
+    # print('Plotting grid cell results...')
+    # for z in range(0, h, 1):
+    #     plt.figure()
+    #     plt.imshow(r[z, :, :], cmap='hot')
+    #     plt.savefig(f'./img/grid_cell_result_{z}.png')  
 
     # # plot with real traj
     # df = pd.read_csv(file_name)
