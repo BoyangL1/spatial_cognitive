@@ -7,7 +7,7 @@ import pickle
 from collections import namedtuple
 from sklearn.preprocessing import MinMaxScaler
 
-TravelData = namedtuple('TravelChain', ['date', 'travel_chain','id_chain'])
+TravelData = namedtuple('TravelChain', ['date', 'travel_chain','id_chain','fnid_chain'])
 
 def loadJsonFile(file_path):
     with open(file_path, 'r') as file:
@@ -102,15 +102,16 @@ def processTrajectoryData(traj_chains, state_attribute, s_dim, place_grid_data):
 def processSingleTrajectory(tc, t, state_attribute, s_dim, destination, place_grid_data):
     if t < len(tc.travel_chain)-1:
         this_state, next_state = tc.travel_chain[t], tc.travel_chain[t + 1]
+        this_fnid, next_fnid = tc.fnid_chain[t], tc.fnid_chain[t+1]
         # state attribute
         s_n_s = onp.zeros((2, s_dim))
-        s_n_s[0, :] = getStateRow(state_attribute, this_state)
-        s_n_s[1, :] = getStateRow(state_attribute, next_state)
+        s_n_s[0, :] = getStateRow(state_attribute, this_fnid)
+        s_n_s[1, :] = getStateRow(state_attribute, next_fnid)
 
         # get grid code of state and destination,dim(8,128,128)
-        this_grid = place_grid_data[this_state]
-        destination_grid = place_grid_data[destination]
-        next_grid = place_grid_data[next_state]
+        this_grid = place_grid_data[tuple(this_state)]
+        destination_grid = place_grid_data[tuple(destination)]
+        next_grid = place_grid_data[tuple(next_state)]
         # combined destination grid code with current grid code
         this_destination_grid = onp.concatenate((this_grid, destination_grid), axis=0)
         next_destination_grid = onp.concatenate((next_grid, destination_grid), axis=0)
@@ -126,12 +127,13 @@ def processSingleTrajectory(tc, t, state_attribute, s_dim, destination, place_gr
         a_n_a[1] = tc.id_chain[t + 2] if t + 2 < len(tc.id_chain) else -1
     else:
         this_state, next_state = tc.travel_chain[t], None
+        this_fnid, next_fnid = tc.fnid_chain[t], None
         s_n_s = onp.zeros((2, s_dim))
-        s_n_s[0, :] = getStateRow(state_attribute, this_state)
+        s_n_s[0, :] = getStateRow(state_attribute, this_fnid)
 
         # get grid code of state and destination,dim(8,128,128)
-        this_grid = place_grid_data[this_state]
-        destination_grid = place_grid_data[destination]
+        this_grid = place_grid_data[tuple(this_state)]
+        destination_grid = place_grid_data[tuple(destination)]
         # combined destination grid code with current grid code
         this_destination_grid = onp.concatenate((this_grid, destination_grid), axis=0)
         next_destination_grid = onp.zeros_like(this_destination_grid)

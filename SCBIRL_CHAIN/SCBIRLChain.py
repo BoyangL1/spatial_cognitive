@@ -409,6 +409,7 @@ class avril:
 
             lik, g_params = loss_grad(params, key, inputs[indexs], targets[indexs], grid_code[indexs])
 
+            print(lik)
             if lik < loss_threshold:
                 print(f"Training stopped at iteration {itr} as loss {lik} is below the threshold {loss_threshold}")
                 break
