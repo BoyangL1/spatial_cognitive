@@ -55,7 +55,6 @@ def calculate_velocity(row):
 
 
 def get_trajectory(file_name):
-    spatial_scale = 250  # m
     df = pd.read_csv(file_name)
     df['stime'] = pd.to_datetime(df['stime'])
     df['etime'] = pd.to_datetime(df['etime'])
@@ -92,4 +91,8 @@ def get_trajectory(file_name):
     
     result_df.to_csv('./data/one_grid_lat_lon.csv',index=False)
     
-    return df.grid_id_o.tolist(),df.grid_id_d.tolist(),df.lambda_o.tolist(),df.phi_o.tolist(),df.lambda_d.tolist(),df.phi_d.tolist(),result_df.lambda_o.tolist(), result_df.phi_o.tolist(), result_df.vx.tolist(), result_df.vy.tolist(),spatial_scale
+    return df.grid_id_o.tolist(),df.grid_id_d.tolist(),df.lambda_o.tolist(),df.phi_o.tolist(),df.lambda_d.tolist(),df.phi_d.tolist(),result_df.lambda_o.tolist(), result_df.phi_o.tolist(), result_df.vx.tolist(), result_df.vy.tolist()
+
+if __name__=="__main__":
+    file_name = './data/one_travel_chain.csv'
+    get_trajectory(file_name)
