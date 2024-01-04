@@ -12,14 +12,25 @@ import pickle
 import os
 import pandas as pd
 from tqdm import tqdm
+from sklearn.preprocessing import MinMaxScaler
 
 from transformer import *
 from BasicCNN import *
 from utils import *
 
+def minmax_scale(x):
+    min_val = np.min(x, axis=0)
+    max_val = np.max(x, axis=0)
+    return (x - min_val) / (max_val - min_val)
+
 def encoder_model(inputs, grid_code, num_layers, num_heads, dff, rate, output_dim, rng, cnn_output_size = 256):
     # Process grid_code using CNN
     cnn_processed_grid_code = process_grid_code(grid_code, cnn_output_size)
+    # Normalization
+    scaler = MinMaxScaler()
+    cnn_reshaped = cnn_processed_grid_code.reshape(-1, cnn_processed_grid_code.shape[-1])
+    cnn_scaled = minmax_scale(cnn_reshaped)
+    cnn_processed_grid_code = cnn_scaled.reshape(cnn_processed_grid_code.shape)
     # Combine inputs and flattened grid_code
     inputs = np.concatenate([inputs, cnn_processed_grid_code], axis=-1)
 
@@ -91,7 +102,7 @@ class avril:
         state_only: bool = True,
 
         cnn_output: int = 256,
-        num_layers: int = 2,
+        num_layers: int = 6,
         num_heads: int = 2,
         dff = 28,
         rate = 0.1,
