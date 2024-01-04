@@ -382,6 +382,7 @@ class avril:
 
         key = self.key
 
+        lik_pre = 0
         for itr in tqdm(range(iters)):
 
             if itr % num_batches == 0:
@@ -394,10 +395,12 @@ class avril:
 
             lik, g_params = loss_grad(params, key, inputs[indexs], targets[indexs], grid_code[indexs])
 
-            print(lik)
-            if lik < loss_threshold:
-                print(f"Training stopped at iteration {itr} as loss {lik} is below the threshold {loss_threshold}")
+            loss_diff = abs(lik-lik_pre)
+            print(loss_diff,lik)
+            if loss_diff < loss_threshold:
+                print(f"Training stopped at iteration {itr} as loss {loss_diff} is below the threshold {loss_threshold}")
                 break
+            lik_pre = lik
 
             param_state = update_fun(itr, g_params, param_state)
 
