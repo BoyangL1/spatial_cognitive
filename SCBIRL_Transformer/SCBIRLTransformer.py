@@ -315,6 +315,12 @@ class avril:
         # calculate TD error
         td = q_values_a - q_values_next_a
         
+        # Selecting unpadded value corresopnding to the real travel chain, delete nan value
+        valid_indices = ~np.isnan(td)
+        td = td[valid_indices]
+        means = means[valid_indices]
+        log_sds = log_sds[valid_indices]
+
         # Add a negative sign in front of each formula to solve for the minimum value
         # Calculate log-likelihood of TD error given reward parameterisation
         lambda_value = 1
@@ -324,8 +330,9 @@ class avril:
         pred = jax.nn.log_softmax(q_values)
         neg_log_lik = -np.take_along_axis(
             pred, targets[:,:, 0, :].astype(np.int32), axis=1
-        ).mean()
-
+        )
+        neg_log_lik = np.nanmean(neg_log_lik)
+        
         return neg_log_lik + kl + lambda_value*irl_loss
     
     def train(self, iters: int = 1000, batch_size: int = 64, l_rate: float = 1e-4, loss_threshold: float = 0.01):
@@ -354,7 +361,8 @@ class avril:
 
         param_state = init_fun(params)
 
-        loss_grad = jit(value_and_grad(self.elbo))
+        # loss_grad = jit(value_and_grad(self.elbo))
+        loss_grad = value_and_grad(self.elbo)
 
         len_x = len(self.inputs[:,:, 0, :])
         num_batches = np.ceil(len_x / batch_size)
@@ -375,6 +383,7 @@ class avril:
 
             lik, g_params = loss_grad(params, key, inputs[indexs], targets[indexs], grid_code[indexs])
 
+            print(lik)
             if lik < loss_threshold:
                 print(f"Training stopped at iteration {itr} as loss {lik} is below the threshold {loss_threshold}")
                 break
@@ -670,12 +679,12 @@ if __name__=="__main__":
     model_save_path = model_dir + 'params_transformer.pickle'
     model.modelSave(model_save_path)
 
-    # NOTE: compute rewards and values before migration
-    feature_file = data_dir + 'before_migrt_feature.csv'
-    computeRewardOrValue(model, feature_file, data_dir + 'before_migrt_reward.csv', place_grid_data, attribute_type='reward')
-    computeRewardOrValue(model, feature_file, data_dir + 'before_migrt_value.csv', place_grid_data, attribute_type='value')
+    # # NOTE: compute rewards and values before migration
+    # feature_file = data_dir + 'before_migrt_feature.csv'
+    # computeRewardOrValue(model, feature_file, data_dir + 'before_migrt_reward.csv', place_grid_data, attribute_type='reward')
+    # computeRewardOrValue(model, feature_file, data_dir + 'before_migrt_value.csv', place_grid_data, attribute_type='value')
 
-    # NOTE: Compute rewards after migration
-    feature_file_all = data_dir + 'all_traj_feature.csv'
-    output_reward_path = data_dir + 'after_migrt_reward.csv'
-    afterMigrt(after_migration_path, before_migration_path, full_trajectory_path, place_grid_data, feature_file_all, output_reward_path, model)
+    # # NOTE: Compute rewards after migration
+    # feature_file_all = data_dir + 'all_traj_feature.csv'
+    # output_reward_path = data_dir + 'after_migrt_reward.csv'
+    # afterMigrt(after_migration_path, before_migration_path, full_trajectory_path, place_grid_data, feature_file_all, output_reward_path, model)

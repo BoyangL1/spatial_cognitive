@@ -68,14 +68,14 @@ def preprocessStateAttributes(traj_file, all_feature_path='./data/all_traj_featu
     # Return the combined DataFrame and the dimension of state attributes
     return pd.concat([fnid_col, scaled_df], axis=1), s_dim
 
-def padSequences(data_list, element_shape, padding_value=float('-inf')):
+def padSequences(data_list, element_shape, padding_value=-999):
     """
     Pad lists of variable lengths containing elements of a specific shape.
 
     Args:
         data_list (list of lists): List of lists containing elements of varying lengths.
         element_shape (tuple): The shape of the elements in the inner lists.
-        padding_value (int, optional): The value to use for padding. Defaults to float('-inf').
+        padding_value (int, optional): The value to use for padding.
 
     Returns:
         numpy array: Padded data_list.
@@ -134,7 +134,7 @@ def processTrajectoryData(traj_chains, state_attribute, s_dim, place_grid_data):
         grid_next_grid.append(gng_chain)
     # pad sequence to the same length
     state_next_state = padSequences(state_next_state,s_n_s.shape)
-    action_next_action = padSequences(action_next_action,a_n_a.shape)
+    action_next_action = padSequences(action_next_action,a_n_a.shape,padding_value=-1)
     grid_next_grid = padSequences(grid_next_grid,g_n_g.shape)
 
     return np.array(state_next_state), np.array(action_next_action), np.array(grid_next_grid)
