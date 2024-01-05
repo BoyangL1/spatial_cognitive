@@ -208,7 +208,7 @@ def loadTrajChain(traj_file, full_traj_path, place_grid_data,num_trajs=None):
 if __name__ == "__main__":
     path = f'./data/before_migrt.json'
     full_traj_path = f'./data/all_traj.json'
-    file_path = './data/place_grid_data.pkl'
+    file_path = './data/coords_grid_data.pkl'
     with open(file_path, 'rb') as file:
         place_grid_data = pickle.load(file)
 
