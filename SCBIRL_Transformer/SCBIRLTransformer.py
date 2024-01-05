@@ -560,8 +560,9 @@ def processAfterMigrationData(tc, stateAttribute, coords_grid_data, model, visit
         list: List of reward values for each state.
     """
     # Preprocess trajectory data and update visited states
-    stateNextState, actionNextAction, grid_next_grid = processTrajectoryData([tc], stateAttribute, model.s_dim, coords_grid_data)
-    visitedState.update(tuple(item) if isinstance(item, list) else item for item in tc.travel_chain)
+    stateNextState, actionNextAction, grid_next_grid = processTrajectoryData(tc, stateAttribute, model.s_dim, coords_grid_data)
+    for t in tc:
+        visitedState.update(tuple(item) if isinstance(item, list) else item for item in t.travel_chain)
 
     # Set model inputs for training or evaluation
     model.inputs = stateNextState
@@ -615,7 +616,7 @@ def processAfterMigrationData(tc, stateAttribute, coords_grid_data, model, visit
     output_dir = f"./data/after_migrt/transProb/"
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
-    dfResults.to_csv(f"./data/after_migrt/transProb/{tc.date}.csv", index=False)
+    dfResults.to_csv(f"./data/after_migrt/transProb/{tc[-1].date}.csv", index=False)
 
     return rewardValues
 
@@ -648,31 +649,37 @@ def afterMigrt(afterMigrtFile, beforeMigrtFile, full_trajectory_path, coords_gri
         # Append the key-value pair as a new row to resultsDf
         resultsDf = resultsDf._append({'coords': key, 'fnid': value}, ignore_index=True)
 
-
     modelDir = "./data/after_migrt/model"
     if not os.path.exists(modelDir):
         os.makedirs(modelDir)
     preDate = 0 # load preDate model parameters
-    for tc in trajChains:
-        # Update model parameters based on the date of trajectory chain.
+    memory_buffer = 10 # days
+
+    for i in range(len(trajChains)):
         if preDate:
             modelPath = os.path.join(modelDir, f"{preDate}.pickle")
             model.loadParams(modelPath)
 
+        if i < memory_buffer:
+            before_chain = all_chains[-(memory_buffer-i):]
+        else:
+            before_chain = trajChains[i-memory_buffer:i]
+        train_chain = before_chain + [trajChains[i]]
+
         # Process and calculate reward values after migration.
-        rewardValues = processAfterMigrationData(tc, stateAttribute, coords_grid_data, model, visitedState, id_coords, coords_fnid, actionDim)
+        rewardValues = processAfterMigrationData(train_chain, stateAttribute, coords_grid_data, model, visitedState, id_coords, coords_fnid, actionDim)
 
         # Train the model.
         model.train(iters=1000)
 
         # Save the current model state.
-        modelSavePath = "./data/after_migrt/model/" + str(tc.date) + ".pickle"
+        modelSavePath = "./data/after_migrt/model/" + str(train_chain[-1].date) + ".pickle"
         model.modelSave(modelSavePath)
 
         # Store the calculated reward values in the results DataFrame.
-        resultsDf[str(tc.date)] = rewardValues
+        resultsDf[str(train_chain[-1].date)] = rewardValues
 
-        preDate = tc.date
+        preDate = train_chain[-1].date
 
     # Save the results to a CSV file.
     resultsDf.to_csv(outputPath, index=False)
@@ -699,14 +706,14 @@ if __name__=="__main__":
     model = avril(inputs, targets_action, grid_code, state_dim, action_dim, state_only=True)
 
     # NOTE: train the model
-    model.train(iters=1000)
-    model_save_path = model_dir + 'params_transformer.pickle'
-    model.modelSave(model_save_path)
+    # model.train(iters=1000)
+    # model_save_path = model_dir + 'params_transformer.pickle'
+    # model.modelSave(model_save_path)
 
     # NOTE: compute rewards and values before migration
-    feature_file = data_dir + 'before_migrt_feature.csv'
-    computeRewardOrValue(model, feature_file, data_dir + 'before_migrt_reward.csv', place_grid_data, attribute_type='reward')
-    computeRewardOrValue(model, feature_file, data_dir + 'before_migrt_value.csv', place_grid_data, attribute_type='value')
+    # feature_file = data_dir + 'before_migrt_feature.csv'
+    # computeRewardOrValue(model, feature_file, data_dir + 'before_migrt_reward.csv', place_grid_data, attribute_type='reward')
+    # computeRewardOrValue(model, feature_file, data_dir + 'before_migrt_value.csv', place_grid_data, attribute_type='value')
 
     # NOTE: Compute rewards after migration
     feature_file_all = data_dir + 'all_traj_feature.csv'
