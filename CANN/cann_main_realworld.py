@@ -142,7 +142,7 @@ if __name__ == "__main__":
     t0 = time.time()
     status = 'Update Grid Cell Model with Real Trajectory!'
     print(status)
-    [r, r_field, r_r, r_l, r_d, r_u, sna_eachlayer, place_grid_dic] = UN.flow_full_model(
+    [r, r_field, r_r, r_l, r_d, r_u, sna_eachlayer, coords_grid_dic, place_grid_dic] = UN.flow_full_model(
         GN, anchor_list,grid_list,x,y,vx, vy, t_index, a, r, r_r, r_l, r_d, r_u, r_masks,singleneuronrec, w_r, w_l, w_u, w_d)
     t_run2 = time.time()-t0
     print("Updating grid cell model with real trajectory took {} seconds".format(t_run2))
@@ -157,7 +157,11 @@ if __name__ == "__main__":
     "********************************************************************************************"
     "****************************************Plot Results****************************************"
     "********************************************************************************************"
-    print("Saving places cell corresponding grid cell networks")
+    print("Saving places coordinate corresponding grid cell networks")
+    with open('./data/coords_grid_data.pkl', 'wb') as file:
+        pickle.dump(coords_grid_dic, file)
+
+    print("Saving place corresponding grid cell networks")
     with open('./data/place_grid_data.pkl', 'wb') as file:
         pickle.dump(place_grid_dic, file)
 

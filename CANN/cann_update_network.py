@@ -214,6 +214,7 @@ def flow_full_model(GN, anchor_list, grid_list, x,y,vx, vy, time_ind, a, r, r_r,
     else:
         row_record = col_record = sna_eachlayer = -999
 
+    coords_grid_dic = dict()
     place_grid_dic = dict()
     for itter in tqdm(range(1, time_ind, 1)):
         vx1 = vx[itter]
@@ -222,8 +223,9 @@ def flow_full_model(GN, anchor_list, grid_list, x,y,vx, vy, time_ind, a, r, r_r,
         [r, r_field, r_l, r_u, r_d, r_r, sna_eachlayer] = update_neuron_activity_with_traj(
             GN, r, r_r, r_l, r_d, r_u, r_masks, r_fft_plan, r_ifft_plan, vx1, vy1, r_field, itter, singleneuronrec, time_ind, sna_eachlayer, row_record, col_record,w_r, w_l, w_u, w_d, a)
         if (x[itter],y[itter]) in anchor_list:
-            # index = anchor_list.index((x[itter], y[itter]))
-            # grid_id = grid_list[index]
-            place_grid_dic[(x[itter], y[itter])] = r
+            index = anchor_list.index((x[itter], y[itter]))
+            grid_id = grid_list[index]
+            coords_grid_dic[(x[itter], y[itter])] = r
+            place_grid_dic[grid_id] = r
 
-    return r, r_field, r_r, r_l, r_d, r_u, sna_eachlayer, place_grid_dic
+    return r, r_field, r_r, r_l, r_d, r_u, sna_eachlayer, coords_grid_dic, place_grid_dic
