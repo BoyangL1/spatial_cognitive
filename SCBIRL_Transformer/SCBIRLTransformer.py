@@ -19,15 +19,14 @@ from BasicCNN import *
 from utils import *
 
 def minmax_scale(x):
-    min_val = np.min(x, axis=0)
-    max_val = np.max(x, axis=0)
+    min_val = np.min(x)
+    max_val = np.max(x)
     return (x - min_val) / (max_val - min_val)
 
 def encoder_model(inputs, grid_code, num_layers, num_heads, dff, rate, output_dim, rng, cnn_output_size = 256):
     # Process grid_code using CNN
     cnn_processed_grid_code = process_grid_code(grid_code, cnn_output_size)
     # Normalization
-    scaler = MinMaxScaler()
     cnn_reshaped = cnn_processed_grid_code.reshape(-1, cnn_processed_grid_code.shape[-1])
     cnn_scaled = minmax_scale(cnn_reshaped)
     cnn_processed_grid_code = cnn_scaled.reshape(cnn_processed_grid_code.shape)
@@ -478,7 +477,7 @@ def readAndPrepareData(afterMigrtFile, beforeMigrtFile, inputPath):
     """
     # Load and process the data of travel chains before migration.
     beforeChains = loadJsonFile(beforeMigrtFile)
-    visitedState = {state for chain in beforeChains for state in chain['travel_chain']}
+    visitedState = {tuple(state) for chain in beforeChains for state in chain['travel_chain']}
 
     # Load and process the data of travel chains after migration.
     loadedDictsList1 = loadJsonFile(afterMigrtFile)
@@ -489,7 +488,7 @@ def readAndPrepareData(afterMigrtFile, beforeMigrtFile, inputPath):
 
     return visitedState, trajChains, stateAttribute
 
-def processBeforeMigrationData(stateAttribute, visitedState, place_grid_data, computeFunc, idFnid, actionDim):
+def processBeforeMigrationData(state_attribute, visitedState, coords_grid_data, computeFunc, id_coords, coords_fnid, actionDim):
     """
     Process and calculate transition probabilities for states before migration. 
     It updates the state attributes with computed action probabilities.
@@ -508,26 +507,24 @@ def processBeforeMigrationData(stateAttribute, visitedState, place_grid_data, co
     beforeMigrtTrans = []
 
     # Iterate over each row in the state attributes DataFrame.
-    for _, row in tqdm(stateAttribute.iterrows(), total=len(stateAttribute)):
+    for coords, fnid in tqdm(coords_fnid.items(), desc="ProcessBeforeMigration"):
         # Extract fnid and state information from the row.
-        fnid = row.values[0]
-        state = np.array(row.values[1:])
-        this_fnid_grid = place_grid_data[fnid]
-        destination_grid = np.zeros_like(this_fnid_grid) # if has specific destination, change this line to real destination grid code
-        grid_code = onp.concatenate((this_fnid_grid, destination_grid), axis=0)
+        state = getStateRow(state_attribute, fnid)
+        this_coords_grid = coords_grid_data[coords]
+        destination_grid = this_coords_grid # if has specific destination, change this line to real destination grid code
+        grid_code = onp.concatenate((this_coords_grid, destination_grid), axis=0)
         # add twree dimension
         grid_code = np.expand_dims(np.expand_dims(np.expand_dims(grid_code, axis=0), axis=0), axis=0)
         state = np.expand_dims(np.expand_dims(np.expand_dims(state, axis=0), axis=0),axis=0)
 
         # Compute action probabilities based on whether the state has been visited.
-        if fnid in visitedState:
+        if coords in visitedState:
             actionProb = []
-            a = computeFunc(state, grid_code)
-            for i, prob in enumerate(computeFunc(state, grid_code)[0]):
-                if i == len(idFnid):# the last one is the "no action"
+            for i, prob in enumerate(computeFunc(state, grid_code)[0][0]):
+                if i == len(id_coords):# the last one is the "no action"
                     actionProb.append(prob)
                     break
-                if idFnid[i] not in visitedState:
+                if id_coords[i] not in visitedState:
                     actionProb.append(0)
                 else:
                     actionProb.append(prob)
@@ -535,36 +532,36 @@ def processBeforeMigrationData(stateAttribute, visitedState, place_grid_data, co
             actionProb = [0 for _ in range(actionDim)]
 
         # Prepare the row for the results DataFrame.
-        resultRow = [fnid] + list(actionProb)
+        resultRow = [coords] + list(actionProb)
         beforeMigrtTrans.append(resultRow)
 
     # Define columns for the results DataFrame, add the "no action" column.
-    columns = ['fnid'] + [idFnid[i] for i in range(actionDim-1)] +['no action']
+    columns = ['coords'] + [id_coords[i] for i in range(actionDim-1)] +['no action']
 
     # Create and save the results DataFrame.
     dfResults = pd.DataFrame(beforeMigrtTrans, columns=columns)
     dfResults.to_csv(f"./data/before_migrt_transProb.csv", index=False)
 
 
-def processAfterMigrationData(tc, stateAttribute, place_grid_data, model, visitedState, idFnid, actionDim):
+def processAfterMigrationData(tc, stateAttribute, coords_grid_data, model, visitedState, id_coords, coords_fnid, actionDim):
     """
     Process data after migration, including calculating rewards and transition probabilities.
 
     Args:
         tc (TrajectoryChain): The trajectory chain object containing migration data.
         stateAttribute (DataFrame): DataFrame containing state attributes.
-        place_grid_data (dict): Dictionary mapping places to their grid data.
+        coords_grid_data (dict): Dictionary mapping coords to their grid data.
         model (Model): The model used for calculations.
         visitedState (set): A set of states that have been visited.
-        idFnid (dict): Dictionary mapping action indices to identifiers.
+        id_coords (dict): Dictionary mapping action indices to coordinate.
         actionDim (int): The dimension of the action space.
 
     Returns:
         list: List of reward values for each state.
     """
     # Preprocess trajectory data and update visited states
-    stateNextState, actionNextAction, grid_next_grid = processTrajectoryData([tc], stateAttribute, model.s_dim, place_grid_data)
-    visitedState.update(tc.travel_chain)
+    stateNextState, actionNextAction, grid_next_grid = processTrajectoryData([tc], stateAttribute, model.s_dim, coords_grid_data)
+    visitedState.update(tuple(item) if isinstance(item, list) else item for item in tc.travel_chain)
 
     # Set model inputs for training or evaluation
     model.inputs = stateNextState
@@ -580,36 +577,39 @@ def processAfterMigrationData(tc, stateAttribute, place_grid_data, model, visite
     results = []
 
     # Iterate over each row in state attributes to compute rewards and action probabilities
-    for _, row in tqdm(stateAttribute.iterrows(), total=len(stateAttribute)):
-        fnid = row.values[0]
-        state = np.array(row.values[1:])
-        this_fnid_grid = place_grid_data[fnid]
-        destination_grid = np.zeros_like(this_fnid_grid)  # Update this line for specific destinations
-        grid_code = onp.concatenate((this_fnid_grid, destination_grid), axis=0)
+    for coords, fnid in tqdm(coords_fnid.items(), desc="ProcessAfterMigration"):
+        # Extract fnid and state information from the row.
+        state = getStateRow(stateAttribute, fnid)
+        this_coords_grid = coords_grid_data[coords]
+        destination_grid = this_coords_grid # if has specific destination, change this line to real destination grid code
+        grid_code = onp.concatenate((this_coords_grid, destination_grid), axis=0)
+        # add twree dimension
         grid_code = np.expand_dims(np.expand_dims(np.expand_dims(grid_code, axis=0), axis=0), axis=0)
-        state = np.expand_dims(np.expand_dims(np.expand_dims(state, axis=0), axis=0), axis = 0)
+        state = np.expand_dims(np.expand_dims(np.expand_dims(state, axis=0), axis=0),axis=0)
 
-        # Calculate reward for visited states
+        # Calculate reward for visited coords
         r = float(rewardFunction(state, grid_code)) if fnid in visitedState else 0
         rewardValues.append(r)
 
-        # Compute action probabilities
-        if fnid in visitedState:
+        if coords in visitedState:
             actionProb = []
-            for i, prob in enumerate(computeFunc(state, grid_code)[0]):
-                if i == len(idFnid):  # Handle "no action"
+            for i, prob in enumerate(computeFunc(state, grid_code)[0][0]):
+                if i == len(id_coords):# the last one is the "no action"
                     actionProb.append(prob)
                     break
-                actionProb.append(0 if idFnid[i] not in visitedState else prob)
+                if id_coords[i] not in visitedState:
+                    actionProb.append(0)
+                else:
+                    actionProb.append(prob)
         else:
-            actionProb = [0] * actionDim
+            actionProb = [0 for _ in range(actionDim)]
 
         # Append results for each state
-        resultRow = [fnid] + list(actionProb)
+        resultRow = [coords] + list(actionProb)
         results.append(resultRow)
 
     # Create and save results DataFrame
-    columns = ['fnid'] + [idFnid[i] for i in range(actionDim-1)] + ['no action']
+    columns = ['coords'] + [id_coords[i] for i in range(actionDim-1)] + ['no action']
     dfResults = pd.DataFrame(results, columns=columns)
 
     output_dir = f"./data/after_migrt/transProb/"
@@ -619,13 +619,15 @@ def processAfterMigrationData(tc, stateAttribute, place_grid_data, model, visite
 
     return rewardValues
 
-def afterMigrt(afterMigrtFile, beforeMigrtFile, full_trajectory_path, place_grid_data, inputPath, outputPath, model):
+def afterMigrt(afterMigrtFile, beforeMigrtFile, full_trajectory_path, coords_grid_data, inputPath, outputPath, model):
     # Load model parameters from a saved state.
     model.loadParams('./model/params_transformer.pickle')
 
     # Load the mapping between IDs and their corresponding fnid.
-    with open("./data/id_fnid_mapping.pkl", "rb") as f:
-        idFnid = pickle.load(f)
+    with open("./data/id_coords_mapping.pkl", "rb") as f:
+        id_coords = pickle.load(f)
+    with open("./data/coords_fnid_mapping.pkl", "rb") as f:
+        coords_fnid = pickle.load(f)
 
     # Define a function to compute Q-values given a state and corresponding grid_code.
     computeFunc = lambda state, grid_code: model.QValue(state,grid_code)
@@ -637,11 +639,15 @@ def afterMigrt(afterMigrtFile, beforeMigrtFile, full_trajectory_path, place_grid
     visitedState, trajChains, stateAttribute = readAndPrepareData(afterMigrtFile, beforeMigrtFile, inputPath)
 
     # Process and update state attributes before migration.
-    processBeforeMigrationData(stateAttribute, visitedState, place_grid_data, computeFunc, idFnid, actionDim)
+    processBeforeMigrationData(stateAttribute, visitedState, coords_grid_data, computeFunc, id_coords, coords_fnid, actionDim)
 
-    # Initialize a DataFrame to store results.
-    resultsDf = pd.DataFrame()
-    resultsDf['fnid'] = stateAttribute['fnid']
+    # Initialize an empty DataFrame with predefined columns
+    resultsDf = pd.DataFrame(columns=['coords', 'fnid'])
+    # Iterate over the coords_fnid dictionary and append each key-value pair to resultsDf
+    for key, value in coords_fnid.items():
+        # Append the key-value pair as a new row to resultsDf
+        resultsDf = resultsDf._append({'coords': key, 'fnid': value}, ignore_index=True)
+
 
     modelDir = "./data/after_migrt/model"
     if not os.path.exists(modelDir):
@@ -654,10 +660,10 @@ def afterMigrt(afterMigrtFile, beforeMigrtFile, full_trajectory_path, place_grid
             model.loadParams(modelPath)
 
         # Process and calculate reward values after migration.
-        rewardValues = processAfterMigrationData(tc, stateAttribute, place_grid_data, model, visitedState, idFnid, actionDim)
+        rewardValues = processAfterMigrationData(tc, stateAttribute, coords_grid_data, model, visitedState, id_coords, coords_fnid, actionDim)
 
         # Train the model.
-        model.train(iters=50000)
+        model.train(iters=1000)
 
         # Save the current model state.
         modelSavePath = "./data/after_migrt/model/" + str(tc.date) + ".pickle"
@@ -698,11 +704,11 @@ if __name__=="__main__":
     model.modelSave(model_save_path)
 
     # NOTE: compute rewards and values before migration
-    # feature_file = data_dir + 'before_migrt_feature.csv'
-    # computeRewardOrValue(model, feature_file, data_dir + 'before_migrt_reward.csv', place_grid_data, attribute_type='reward')
-    # computeRewardOrValue(model, feature_file, data_dir + 'before_migrt_value.csv', place_grid_data, attribute_type='value')
+    feature_file = data_dir + 'before_migrt_feature.csv'
+    computeRewardOrValue(model, feature_file, data_dir + 'before_migrt_reward.csv', place_grid_data, attribute_type='reward')
+    computeRewardOrValue(model, feature_file, data_dir + 'before_migrt_value.csv', place_grid_data, attribute_type='value')
 
-    # # NOTE: Compute rewards after migration
-    # feature_file_all = data_dir + 'all_traj_feature.csv'
-    # output_reward_path = data_dir + 'after_migrt_reward.csv'
-    # afterMigrt(after_migration_path, before_migration_path, full_trajectory_path, place_grid_data, feature_file_all, output_reward_path, model)
+    # NOTE: Compute rewards after migration
+    feature_file_all = data_dir + 'all_traj_feature.csv'
+    output_reward_path = data_dir + 'after_migrt_reward.csv'
+    afterMigrt(after_migration_path, before_migration_path, full_trajectory_path, coords_grid_data, feature_file_all, output_reward_path, model)
