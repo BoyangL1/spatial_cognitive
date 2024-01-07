@@ -589,7 +589,7 @@ def processAfterMigrationData(tc, stateAttribute, coords_grid_data, model, visit
         state = np.expand_dims(np.expand_dims(np.expand_dims(state, axis=0), axis=0),axis=0)
 
         # Calculate reward for visited coords
-        r = float(rewardFunction(state, grid_code)) if fnid in visitedState else 0
+        r = float(rewardFunction(state, grid_code)) if coords in visitedState else 0
         rewardValues.append(r)
 
         if coords in visitedState:
@@ -706,14 +706,14 @@ if __name__=="__main__":
     model = avril(inputs, targets_action, grid_code, state_dim, action_dim, state_only=True)
 
     # NOTE: train the model
-    model.train(iters=1000)
-    model_save_path = model_dir + 'params_transformer.pickle'
-    model.modelSave(model_save_path)
+    # model.train(iters=1000)
+    # model_save_path = model_dir + 'params_transformer.pickle'
+    # model.modelSave(model_save_path)
 
     # NOTE: compute rewards and values before migration
-    feature_file = data_dir + 'before_migrt_feature.csv'
-    computeRewardOrValue(model, feature_file, data_dir + 'before_migrt_reward.csv', place_grid_data, attribute_type='reward')
-    computeRewardOrValue(model, feature_file, data_dir + 'before_migrt_value.csv', place_grid_data, attribute_type='value')
+    # feature_file = data_dir + 'before_migrt_feature.csv'
+    # computeRewardOrValue(model, feature_file, data_dir + 'before_migrt_reward.csv', place_grid_data, attribute_type='reward')
+    # computeRewardOrValue(model, feature_file, data_dir + 'before_migrt_value.csv', place_grid_data, attribute_type='value')
 
     # NOTE: Compute rewards after migration
     feature_file_all = data_dir + 'all_traj_feature.csv'
