@@ -50,6 +50,10 @@ def create_look_ahead_mask(size):
 def q_network_model(inputs, enc_output, grid_code, num_layers, num_heads, dff, rate, output_dim, rng, cnn_output_size=256):
     # Process grid_code using CNN
     cnn_processed_grid_code = process_grid_code(grid_code, cnn_output_size)
+    # Normalization
+    cnn_reshaped = cnn_processed_grid_code.reshape(-1, cnn_processed_grid_code.shape[-1])
+    cnn_scaled = minmax_scale(cnn_reshaped)
+    cnn_processed_grid_code = cnn_scaled.reshape(cnn_processed_grid_code.shape)
     # Combine inputs and flattened grid_code
     inputs = np.concatenate([inputs, cnn_processed_grid_code], axis=-1)
 
@@ -345,7 +349,7 @@ class avril:
         
         return neg_log_lik + kl + lambda_value*irl_loss
     
-    def train(self, iters: int = 1000, batch_size: int = 64, l_rate: float = 1e-4, loss_threshold: float = 0.001):
+    def train(self, iters: int = 1000, batch_size: int = 64, l_rate: float = 1e-4, loss_threshold: float = 0.1):
         """
         Training function for the model.
 
@@ -435,7 +439,7 @@ def computeRewardOrValue(model, input_path, output_path, place_grid_data, attrib
         # get grid code of this fnid
         fnid = row.fnid
         this_fnid_grid = place_grid_data[fnid]
-        destination_grid = np.zeros_like(this_fnid_grid) # if has specific destination, change this line to real destination grid code
+        destination_grid = this_fnid_grid # if has specific destination, change this line to real destination grid code
         grid_code = onp.concatenate((this_fnid_grid, destination_grid), axis=0)
         # get state attribute of this fnid
         state = np.array(row.values[1:-1])
@@ -712,6 +716,7 @@ if __name__=="__main__":
 
     # NOTE: compute rewards and values before migration
     feature_file = data_dir + 'before_migrt_feature.csv'
+    model.loadParams('./model/params_transformer.pickle')
     computeRewardOrValue(model, feature_file, data_dir + 'before_migrt_reward.csv', place_grid_data, attribute_type='reward')
     computeRewardOrValue(model, feature_file, data_dir + 'before_migrt_value.csv', place_grid_data, attribute_type='value')
 
