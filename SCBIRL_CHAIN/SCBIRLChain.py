@@ -362,7 +362,7 @@ class avril:
             self.load_params = True
             self.pre_params = self.params
 
-    def train(self, iters: int = 1000, batch_size: int = 64, l_rate: float = 1e-4, loss_threshold: float = 0.01):
+    def train(self, iters: int = 1000, batch_size: int = 64, l_rate: float = 1e-4, loss_threshold: float = 0.001):
         """
         Training function for the model.
 
@@ -397,6 +397,7 @@ class avril:
 
         key = self.key
 
+        lik_pre = 0
         for itr in tqdm(range(iters)):
 
             if itr % num_batches == 0:
@@ -409,10 +410,12 @@ class avril:
 
             lik, g_params = loss_grad(params, key, inputs[indexs], targets[indexs], grid_code[indexs])
 
-            print(lik)
-            if lik < loss_threshold:
-                print(f"Training stopped at iteration {itr} as loss {lik} is below the threshold {loss_threshold}")
+            loss_diff = abs(lik-lik_pre)
+            print(loss_diff,lik)
+            if loss_diff < loss_threshold:
+                print(f"Training stopped at iteration {itr} as loss {loss_diff} is below the threshold {loss_threshold}")
                 break
+            lik_pre = lik
 
             param_state = update_fun(itr, g_params, param_state)
 
@@ -448,7 +451,7 @@ def computeRewardOrValue(model, input_path, output_path, place_grid_data, attrib
         # get grid code of this fnid
         fnid = row.fnid
         this_fnid_grid = place_grid_data[fnid]
-        destination_grid = np.zeros_like(this_fnid_grid) # if has specific destination, change this line to real destination grid code
+        destination_grid = this_fnid_grid # if has specific destination, change this line to real destination grid code
         grid_code = onp.concatenate((this_fnid_grid, destination_grid), axis=0)
         # get state attribute of this fnid
         state = np.array(row.values[1:-1])
@@ -688,9 +691,13 @@ def afterMigrt(afterMigrtFile, beforeMigrtFile, full_trajectory_path, place_grid
 if __name__ == "__main__":
     data_dir = './data/'
     model_dir = './model/'
-    file_path = './data/place_grid_data.pkl'
+    coords_file_path = './data/coords_grid_data.pkl'
+    place_file_path = './data/place_grid_data.pkl'
     
-    with open(file_path, 'rb') as file:
+    with open(coords_file_path, 'rb') as file:
+        coords_grid_data = pickle.load(file)
+
+    with open(place_file_path, 'rb') as file:
         place_grid_data = pickle.load(file)
 
     # Paths for data files
@@ -699,17 +706,18 @@ if __name__ == "__main__":
     full_trajectory_path = data_dir + 'all_traj.json'
     
     # Initialize the model
-    inputs, targets_action, grid_code, action_dim, state_dim= loadTrajChain(before_migration_path, full_trajectory_path,place_grid_data)
+    inputs, targets_action, grid_code, action_dim, state_dim= loadTrajChain(before_migration_path, full_trajectory_path,coords_grid_data)
     print(inputs.shape, targets_action.shape, grid_code.shape,action_dim, state_dim)
     model = avril(inputs, targets_action, grid_code, state_dim, action_dim, state_only=True)
 
     # NOTE: train the model
-    model.train(iters=50000)
+    model.train(iters=1000)
     model_save_path = model_dir + 'params.pickle'
     model.modelSave(model_save_path)
     
     # NOTE: compute rewards and values before migration
     # feature_file = data_dir + 'before_migrt_feature.csv'
+    # model.loadParams('./model/params.pickle')
     # computeRewardOrValue(model, feature_file, data_dir + 'before_migrt_value.csv', place_grid_data, attribute_type='value')
     # computeRewardOrValue(model, feature_file, data_dir + 'before_migrt_reward.csv', place_grid_data, attribute_type='reward')
     
