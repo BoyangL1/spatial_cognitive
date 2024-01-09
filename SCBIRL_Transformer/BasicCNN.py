@@ -19,10 +19,19 @@ class BasicCNN(hk.Module):
         x = self.dense(x)
         return x
 
+def min_max_normalize(grid_code):
+    min_val = grid_code.min()
+    max_val = grid_code.max()
+    grid_code_normalized = (grid_code - min_val) / (max_val - min_val)
+    return grid_code_normalized
+
 def process_grid_code(grid_code, output_size):
     batch_size, sequence_size, state_steps = grid_code.shape[:3]
+    grid_code = min_max_normalize(grid_code)
+
     grid_code_reshaped = np.reshape(grid_code, [-1, *grid_code.shape[3:]]) 
     cnn = BasicCNN(output_size)
     cnn_output = cnn(grid_code_reshaped)
     cnn_output_reshaped = np.reshape(cnn_output, [batch_size, sequence_size, state_steps, -1])
+    
     return cnn_output_reshaped

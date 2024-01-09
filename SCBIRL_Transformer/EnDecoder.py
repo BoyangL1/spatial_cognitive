@@ -5,18 +5,9 @@ import jax.numpy as np
 from transformer import *
 from BasicCNN import *
 
-def minmax_scale(x):
-    min_val = np.min(x)
-    max_val = np.max(x)
-    return (x - min_val) / (max_val - min_val)
-
-def encoder_model(inputs, grid_code, num_layers, num_heads, dff, rate, output_dim, rng, cnn_output_size = 256):
+def encoder_model(inputs, grid_code, num_layers, num_heads, dff, rate, output_dim, rng, cnn_output_size = 16):
     # Process grid_code using CNN
     cnn_processed_grid_code = process_grid_code(grid_code, cnn_output_size)
-    # Normalization
-    cnn_reshaped = cnn_processed_grid_code.reshape(-1, cnn_processed_grid_code.shape[-1])
-    cnn_scaled = minmax_scale(cnn_reshaped)
-    cnn_processed_grid_code = cnn_scaled.reshape(cnn_processed_grid_code.shape)
     # Combine inputs and flattened grid_code
     inputs = np.concatenate([inputs, cnn_processed_grid_code], axis=-1)
 
@@ -34,13 +25,9 @@ def create_look_ahead_mask(size):
     mask = mask[np.newaxis, np.newaxis, ...]
     return mask
 
-def q_network_model(inputs, enc_output, grid_code, num_layers, num_heads, dff, rate, output_dim, rng, cnn_output_size=256):
+def q_network_model(inputs, enc_output, grid_code, num_layers, num_heads, dff, rate, output_dim, rng, cnn_output_size = 16):
     # Process grid_code using CNN
     cnn_processed_grid_code = process_grid_code(grid_code, cnn_output_size)
-    # Normalization
-    cnn_reshaped = cnn_processed_grid_code.reshape(-1, cnn_processed_grid_code.shape[-1])
-    cnn_scaled = minmax_scale(cnn_reshaped)
-    cnn_processed_grid_code = cnn_scaled.reshape(cnn_processed_grid_code.shape)
     # Combine inputs and flattened grid_code
     inputs = np.concatenate([inputs, cnn_processed_grid_code], axis=-1)
 

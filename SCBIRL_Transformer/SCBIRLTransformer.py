@@ -36,8 +36,8 @@ class avril:
         action_dim: int,
         state_only: bool = True,
 
-        cnn_output: int = 256,
-        num_layers: int = 6,
+        cnn_output: int = 16,
+        num_layers: int = 2,
         num_heads: int = 2,
         dff = 28,
         rate = 0.1,
