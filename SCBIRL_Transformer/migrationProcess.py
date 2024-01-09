@@ -11,7 +11,7 @@ from BasicCNN import *
 from utils import *
 from EnDecoder import *
 
-def computeRewardOrValue(model, input_path, output_path, place_grid_data, attribute_type='value'):
+def computeRewardOrValue(model, input_path, output_path, coords_grid_data, attribute_type='value'):
     """
     Compute rewards or state values for each state using a given model and save to a CSV file.
 
@@ -28,29 +28,32 @@ def computeRewardOrValue(model, input_path, output_path, place_grid_data, attrib
     # Using preprocessing function from utils
     state_attribute, _ = preprocessStateAttributes('./data/before_migrt.json',input_path)
 
-    # Add a column for attribute_type
-    state_attribute[attribute_type] = 0.0
-
     computeFunc = getComputeFunction(model, attribute_type)
-    
-    for index, row in tqdm(state_attribute.iterrows(), total=len(state_attribute)):
-        # get grid code of this fnid
-        fnid = row.fnid
-        this_fnid_grid = place_grid_data[fnid]
-        destination_grid = this_fnid_grid # if has specific destination, change this line to real destination grid code
-        grid_code = onp.concatenate((this_fnid_grid, destination_grid), axis=0)
-        # get state attribute of this fnid
-        state = np.array(row.values[1:-1])
 
+    with open("./data/coords_fnid_mapping.pkl", "rb") as f:
+        coords_fnid = pickle.load(f)
+    
+    rewardValues = []
+    for coords, fnid in tqdm(coords_fnid.items(), total=len(coords_fnid)):
+        if fnid not in state_attribute.fnid.values:
+            continue
+
+        this_coords_grid = coords_grid_data[coords]
+        destination_grid = np.zeros_like(this_coords_grid) # if has specific destination, change this line to real destination grid code
+        grid_code = onp.concatenate((this_coords_grid, destination_grid), axis=0)
+        # get state attribute of this fnid
+        state = getStateRow(state_attribute,fnid)
         # add three dimension
         grid_code = np.expand_dims(np.expand_dims(np.expand_dims(grid_code, axis=0), axis=0), axis = 0)
         state = np.expand_dims(np.expand_dims(np.expand_dims(state, axis=0), axis=0), axis = 0)
+
         # change state attribute and gird code to 
-        a = computeFunc(state,grid_code)
-        state_attribute.iloc[index, -1] = float(computeFunc(state,grid_code))
-        
+        r = float(computeFunc(state,grid_code))
+        rewardValues.append((coords, r))
+
+    reward_df = pd.DataFrame(rewardValues, columns=['coords', 'reward'])
     if output_path is not None:
-        state_attribute.to_csv(output_path, index=False)
+        reward_df.to_csv(output_path, index=False)
     return
 
 def getComputeFunction(model, attribute_type):
