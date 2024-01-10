@@ -367,9 +367,9 @@ if __name__=="__main__":
     model = avril(inputs, targets_action, grid_code, state_dim, action_dim, state_only=True)
 
     # NOTE: train the model
-    # model.train(iters=1000)
-    # model_save_path = model_dir + 'params_transformer.pickle'
-    # model.modelSave(model_save_path)
+    model.train(iters=1000)
+    model_save_path = model_dir + 'params_transformer.pickle'
+    model.modelSave(model_save_path)
 
     # NOTE: compute rewards and values before migration
     feature_file = data_dir + 'before_migrt_feature.csv'
@@ -378,6 +378,6 @@ if __name__=="__main__":
     computeRewardOrValue(model, feature_file, data_dir + 'before_migrt_value.csv', coords_grid_data, attribute_type='value')
 
     # NOTE: Compute rewards after migration
-    # feature_file_all = data_dir + 'all_traj_feature.csv'
-    # output_reward_path = data_dir + 'after_migrt_reward.csv'
-    # afterMigrt(after_migration_path, before_migration_path, full_trajectory_path, coords_grid_data, feature_file_all, output_reward_path, model)
+    feature_file_all = data_dir + 'all_traj_feature.csv'
+    output_reward_path = data_dir + 'after_migrt_reward.csv'
+    afterMigrt(after_migration_path, before_migration_path, full_trajectory_path, coords_grid_data, feature_file_all, output_reward_path, model)

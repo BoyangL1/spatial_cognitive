@@ -47,7 +47,7 @@ def computeRewardOrValue(model, input_path, output_path, coords_grid_data, attri
         grid_code = np.expand_dims(np.expand_dims(np.expand_dims(grid_code, axis=0), axis=0), axis = 0)
         state = np.expand_dims(np.expand_dims(np.expand_dims(state, axis=0), axis=0), axis = 0)
 
-        # change state attribute and gird code to 
+        # get reward value
         r = float(computeFunc(state,grid_code))
         rewardValues.append((coords, r))
 
@@ -239,6 +239,7 @@ def afterMigrt(afterMigrtFile, beforeMigrtFile, full_trajectory_path, coords_gri
     computeFunc = lambda state, grid_code: model.QValue(state,grid_code)
 
     all_chains = loadTravelDataFromDicts(loadJsonFile(full_trajectory_path))
+    before_migrt_chains = loadTravelDataFromDicts(loadJsonFile(beforeMigrtFile))
     actionDim = getActionDim(all_chains)
 
     # Read and preprocess data for analysis.
@@ -266,7 +267,7 @@ def afterMigrt(afterMigrtFile, beforeMigrtFile, full_trajectory_path, coords_gri
             model.loadParams(modelPath)
 
         if i < memory_buffer:
-            before_chain = all_chains[-(memory_buffer-i):]
+            before_chain = before_migrt_chains[-(memory_buffer-i):]
         else:
             before_chain = trajChains[i-memory_buffer:i]
         train_chain = before_chain + [trajChains[i]]
