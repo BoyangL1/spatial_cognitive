@@ -116,7 +116,7 @@ def processBeforeMigrationData(state_attribute, visitedState, coords_grid_data, 
         # Extract fnid and state information from the row.
         state = getStateRow(state_attribute, fnid)
         this_coords_grid = coords_grid_data[coords]
-        destination_grid = this_coords_grid # if has specific destination, change this line to real destination grid code
+        destination_grid = np.zeros_like(this_coords_grid) # if has specific destination, change this line to real destination grid code
         grid_code = onp.concatenate((this_coords_grid, destination_grid), axis=0)
         # add twree dimension
         grid_code = np.expand_dims(np.expand_dims(np.expand_dims(grid_code, axis=0), axis=0), axis=0)
@@ -187,7 +187,7 @@ def processAfterMigrationData(tc, stateAttribute, coords_grid_data, model, visit
         # Extract fnid and state information from the row.
         state = getStateRow(stateAttribute, fnid)
         this_coords_grid = coords_grid_data[coords]
-        destination_grid = this_coords_grid # if has specific destination, change this line to real destination grid code
+        destination_grid = np.zeros_like(this_coords_grid) # if has specific destination, change this line to real destination grid code
         grid_code = onp.concatenate((this_coords_grid, destination_grid), axis=0)
         # add twree dimension
         grid_code = np.expand_dims(np.expand_dims(np.expand_dims(grid_code, axis=0), axis=0), axis=0)
