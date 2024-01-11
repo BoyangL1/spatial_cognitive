@@ -78,10 +78,10 @@ def update_neuron_activity(GN,r, r_r, r_l, r_d, r_u,r_masks,r_fft_plan, r_ifft_p
         rwu_r = RN.convolve_both(r_fft_plan, r_ifft_plan, r_r, w_r, GN.umag, GN.npad, GN.h)
 
     # calculate fields
-    [r_l, r_field_l] = RN.calculate_field(r, r_l, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[0, :, :], a, 1.0-GN.vgain*vx, GN.h, GN.n, GN.npad, itter)
-    [r_r, r_field_r] = RN.calculate_field(r, r_r, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[1, :, :], a, 1.0+GN.vgain*vx, GN.h, GN.n, GN.npad, itter)
-    [r_u, r_field_u] = RN.calculate_field(r, r_u, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[2, :, :], a, 1.0+GN.vgain*vy, GN.h, GN.n, GN.npad, itter)
-    [r_d, r_field_d] = RN.calculate_field(r, r_d, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[3, :, :], a, 1.0-GN.vgain*vy, GN.h, GN.n, GN.npad, itter)
+    [r_l, r_field_l] = RN.calculate_field(r, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[0, :, :], a, 1.0-GN.vgain*vx, GN.h, GN.n, GN.npad)
+    [r_r, r_field_r] = RN.calculate_field(r, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[1, :, :], a, 1.0+GN.vgain*vx, GN.h, GN.n, GN.npad)
+    [r_u, r_field_u] = RN.calculate_field(r, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[2, :, :], a, 1.0+GN.vgain*vy, GN.h, GN.n, GN.npad)
+    [r_d, r_field_d] = RN.calculate_field(r, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[3, :, :], a, 1.0-GN.vgain*vy, GN.h, GN.n, GN.npad)
 
     # fix error r_field not being updated uniquely for each of the directions correctly
     r_field = r_field_l + r_field_r + r_field_u + r_field_d
@@ -162,14 +162,10 @@ def update_neuron_activity_with_traj(GN,r, r_r, r_l, r_d, r_u, r_masks,r_fft_pla
         rwu_r = RN.convolve_both(r_fft_plan, r_ifft_plan, r_r, w_r, GN.umag, GN.npad, GN.h)
 
     # calculate fields
-    [r_l, r_field_l] = RN.calculate_field(
-        r, r_l, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[0, :, :], a, 1.0-GN.vgain*vx, GN.h, GN.n, GN.npad, itter)
-    [r_r, r_field_r] = RN.calculate_field(
-        r, r_r, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[1, :, :], a, 1.0+GN.vgain*vx, GN.h, GN.n, GN.npad, itter)
-    [r_u, r_field_u] = RN.calculate_field(
-        r, r_u, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[2, :, :], a, 1.0+GN.vgain*vy, GN.h, GN.n, GN.npad, itter)
-    [r_d, r_field_d] = RN.calculate_field(
-        r, r_d, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[3, :, :], a, 1.0-GN.vgain*vy, GN.h, GN.n, GN.npad, itter)
+    [r_l, r_field_l] = RN.calculate_field(r, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[0, :, :], a, 1.0-GN.vgain*vx, GN.h, GN.n, GN.npad)
+    [r_r, r_field_r] = RN.calculate_field(r, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[1, :, :], a, 1.0+GN.vgain*vx, GN.h, GN.n, GN.npad)
+    [r_u, r_field_u] = RN.calculate_field(r, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[2, :, :], a, 1.0+GN.vgain*vy, GN.h, GN.n, GN.npad)
+    [r_d, r_field_d] = RN.calculate_field(r, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[3, :, :], a, 1.0-GN.vgain*vy, GN.h, GN.n, GN.npad)
 
     # fix error r_field not being updated uniquely for each of the directions correctly
     r_field = r_field_l + r_field_r + r_field_u + r_field_d

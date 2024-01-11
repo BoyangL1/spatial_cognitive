@@ -74,7 +74,7 @@ def convolve_both(r_fft_plan, r_ifft_plan, r_dir, w_dir, u, npad, h):
 
     return rwu_dir
 
-def calculate_field(r, r_dir, rwu_l, rwu_r, rwu_d, rwu_u, r_masks, a, vgain_fac, h, n, npad, itter):
+def calculate_field(r, rwu_l, rwu_r, rwu_d, rwu_u, r_masks, a, vgain_fac, h, n, npad):
     """ 
     Calculate field with input after all rates are updated from convolution
     """
