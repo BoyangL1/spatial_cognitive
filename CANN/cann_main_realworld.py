@@ -33,13 +33,14 @@ if __name__ == "__main__":
     wshift = 1
 
     # Coupling Parameters
-    umag = -0.001  # for spike model, mean(w)
+    umag = -0.001  # for spike model, mean(w), connection stength from other layer
     urad = 4.0  # for rate model
-    u_dv = 1  # 1 corresponds to dorsal to ventral
-    u_vd = 1  # 1 corresponds to ventral to dorsal
+    u_dv = 0  # 1 corresponds to dorsal to ventral
+    u_vd = 0  # 1 corresponds to ventral to dorsal
 
     # Initial value for rates for grid units
     rinit = 1e-3
+    r_field_base = 0.6
 
     # Hippocampal Parameters
     amag = .6  # now trying . 6 from Alex's paper, was 1;#trying .7 instead of .5 due to particularly low activity in network when checked #1 in rate model
@@ -70,14 +71,7 @@ if __name__ == "__main__":
     rnoise = 0.0
     vgain = .4
 
-    still = 0  # no motion if true; clears vx and vy from loaded or simulated trajectory
-
-    if still:
-        vx = 0
-        vy = 0
-
     vflow = .8
-    theta_flow = UNDEF
 
     # spiking simulation
     spiking = 1  # set whether spiking model or rate model 0 or 1 respectively
@@ -86,8 +80,7 @@ if __name__ == "__main__":
     else:
         print('spike coded network')
 
-    GN = UN.GridNeuronNetwork(h,n,dt,tau,0, 0, 0, 0, 0, 0, wmag, lmin,
-                            lmax, wshift, umag, urad, u_dv, u_vd, rinit, amag, falloff, falloff_low, falloff_high,npad, rnoise, vgain)
+    GN = UN.GridNeuronNetwork(h, n, dt, tau, wmag, lmin, lmax, wshift, umag, urad, u_dv, u_vd, rinit, r_field_base, amag, falloff, falloff_low, falloff_high,npad, rnoise, vgain)
     
     file_name = './data/one_travel_chain.csv'
     # Get Trajectory Data
@@ -128,13 +121,13 @@ if __name__ == "__main__":
         GN,t_index, 0, 0, nflow0, 1, a, r, r_r, r_l, r_d, r_u, r_masks, singleneuronrec, w_r, w_l, w_u, w_d)
     # constant velocity
     [r, r_field, r_r, r_l, r_d, r_u] = UN.flow_neuron_activity(
-        GN,t_index,vflow, (np.pi/2-np.pi/5), nflow1, 2, a, r, r_r, r_l, r_d, r_u, r_masks, singleneuronrec, w_r, w_l, w_u, w_d)
+        GN,t_index,vflow, np.pi/3, nflow1, 2, a, r, r_r, r_l, r_d, r_u, r_masks, singleneuronrec, w_r, w_l, w_u, w_d)
     
     [r, r_field, r_r, r_l, r_d, r_u] = UN.flow_neuron_activity(
-        GN,t_index,vflow, (np.pi/5), nflow1, 3, a, r, r_r, r_l, r_d, r_u, r_masks, singleneuronrec, w_r, w_l, w_u, w_d)
+        GN,t_index,vflow, 2*np.pi/3, nflow1, 3, a, r, r_r, r_l, r_d, r_u, r_masks, singleneuronrec, w_r, w_l, w_u, w_d)
 
     [r, r_field, r_r, r_l, r_d, r_u] = UN.flow_neuron_activity(
-        GN,t_index,vflow, (np.pi/4), nflow1, 4, a, r, r_r, r_l, r_d, r_u, r_masks, singleneuronrec, w_r, w_l, w_u, w_d)
+        GN,t_index,vflow, np.pi, nflow1, 4, a, r, r_r, r_l, r_d, r_u, r_masks, singleneuronrec, w_r, w_l, w_u, w_d)
     t_run1 = time.time()-t0
     print("Initializing grid cells in 4 phases took {} seconds".format(t_run1))
 

@@ -7,133 +7,6 @@ import os
 
 UNDEF = -999
 
-def nan_helper(y):
-    """Helper to handle indices and logical indices of NaNs.
-
-    Input:
-        - y, 1d numpy array with possible NaNs
-    Output:
-        - nans, logical indices of NaNs
-        - index, a function, with signature indices= index(logical_indices),
-          to convert logical indices of NaNs to 'equivalent' indices
-    Example:
-        >>> # linear interpolation of NaNs
-        >>> nans, x= nan_helper(y)
-        >>> y[nans]= np.interp(x(nans), x(~nans), y[~nans])
-    """
-
-    return np.isnan(y), lambda z: z.nonzero()[0]
-
-
-def get_trajectory(traj_filename, dt, num_minutes):
-    """
-    Loads trajectory data
-    Args:
-        traj_filename: The filename of the trajectory data file
-        dt: Time step for the model (in milliseconds)
-        num_minutes: Duration of the trajectory data to be loaded (in minutes)
-
-    Returns:
-        x, y: Original x and y coordinates (in centimeters) from the trajectory data
-        x_ind, y_ind: Indices of the resampled x and y coordinates
-        x_of_bins, y_of_bins: Arrays representing the spatial bins for x and y
-        vx, vy: Velocity in x and y directions (converted to meters per second)
-        spatial_scale: Scaling factor used for the trajectory data
-        boundaries: The spatial boundaries of the environment
-        time_ind: The number of time steps for the model to run
-        traj_filename: The filename of the trajectory data file
-    """    
-    print('getting trajectory data from Hass lab')
-
-    unpack = io.loadmat(traj_filename)
-    times = num_minutes * 60  # convert to seconds
-    traj_fs = unpack['traj_fs']
-
-    # currently hard coding in the 5 since we only pulled 5 minutes of data from each session*********
-    # time stamps (in seconds) for positions with original sampling rate
-    sesh_ts_og = np.arange(0, times, 1/traj_fs)
-    # new time stamps (in seconds) for dt of model sampling rate
-    sesh_ts_interp = np.arange(0, (times), (dt/1000))
-
-    spatial_scale = unpack['traj_spatial_scale']
-    # position in cm, below is in indecies, resample up to dt samples
-    x = unpack['traj_x']*spatial_scale
-    # position in cm, below is in indecies, resample up to dt samples
-    y = unpack['traj_y']*spatial_scale
-
-    # dumb issue with grids, at least here not matching like with like aka loading full x and y even though simulation is for 5 minutes only
-    # only take x's for time grabbed, this hopefully will fix issues with x_ind being full session when it should be 5 minutes
-    x = x[0:np.size(sesh_ts_og)+1]
-    y = y[0:np.size(sesh_ts_og)+1]
-
-    # just to make sure we are all equal
-    sesh_ts_og = sesh_ts_og[0:np.size(x)]
-
-    # dumb fix to adjust for interpolation issues with some values of sesh_ts_interp being outside the range of sesh_ts_og
-    sesh_ts_interp[sesh_ts_interp > np.max(sesh_ts_og)] = np.max(sesh_ts_og)
-
-    if any(np.isnan(x)) or any(np.isnan(y)):
-
-        nans1, t1 = nan_helper(x)
-        nans2, t2 = nan_helper(y)
-
-        x[nans1] = np.interp(t1(nans1), t1(~nans1), x[~nans1])
-        y[nans2] = np.interp(t2(nans2), t2(~nans2), y[~nans2])
-
-    # note hardcode issue
-    # resample up to dt samples
-    x_ind = np.round(signal.resample(x/spatial_scale, int(times/(dt/1000))))
-    x_ind = x_ind.astype('int')
-    # resample up to dt samples
-    y_ind = np.round(signal.resample(y/spatial_scale, int(times/(dt/1000))))
-    y_ind = y_ind.astype('int')
-
-    # flipping around to make sure get all velocities we can (i.e. since pairing off need to count from back since first ind will be one without pair)
-    x_temp = x[::-1]
-    y_temp = y[::-1]
-
-    vx_new = x_temp[0:-2:1]-x_temp[1:-1:1]
-    # get first subtraction back in
-    vx_new = np.append(vx_new, x_temp[1] - x_temp[0])
-    vx_new = vx_new[::-1]  # flip back around
-    vx_new = np.append(0, vx_new,)*traj_fs  # append first zero
-
-    vy_new = y_temp[0:-2:1]-y_temp[1:-1:1]
-    # get first subtraction back in
-    vy_new = np.append(vy_new, y_temp[1] - y_temp[0])
-    vy_new = vy_new[::-1]  # flip back around
-    vy_new = np.append(0, vy_new,)*traj_fs  # append first zero
-
-    fvx = interpolate.interp1d(sesh_ts_og, vx_new[0, 0:np.size(sesh_ts_og)])
-
-    fvy = interpolate.interp1d(sesh_ts_og, vy_new[0, 0:np.size(sesh_ts_og)])
-
-    vx_new = fvx(sesh_ts_interp)
-    vy_new = fvy(sesh_ts_interp)
-
-    vx = vx_new/100.0  # to convert to M/S to align with other models
-    vy = vy_new/100.0
-
-    dim_box = np.array([1.0, 1.0])*np.max([np.max(x), np.max(y)])
-    boundaries = ([0, 0], [dim_box[0], dim_box[1]])
-
-    x_of_bins = np.arange(np.min(boundaries, 0)[0], np.max(
-        boundaries, 0)[0]+spatial_scale, spatial_scale)
-    y_of_bins = np.arange(np.min(boundaries, 0)[1], np.max(
-        boundaries, 0)[1]+spatial_scale, spatial_scale)
-
-    if np.any(x_ind >= np.size(x_of_bins)) or np.any(y_ind >= np.size(y_of_bins)):
-
-        x_ind[x_ind >= np.size(x_of_bins)] = np.size(x_of_bins)-1
-        y_ind[x_ind >= np.size(y_of_bins)] = np.size(y_of_bins)-1
-
-    # simply the number of indecies and therefore iterations for the model to run
-    time_ind = int(times/(dt/1000))
-
-    return x, y, x_ind, y_ind, x_of_bins, y_of_bins, vx, vy, spatial_scale, boundaries, time_ind, traj_filename
-
-###############################################################################
-
 def set_inhib_length(h_grid, lexp, lmin, lmax):
     """ 
     Sets up inhibition radius across the layers
@@ -175,18 +48,23 @@ def setup_recurrent(h, npad, l_inhibition, wmag, wshift):
     """ 
     Set up recurrent continuous attractor network for gird cell
     """
-    x = np.arange(-npad/2, npad/2)  # o.g.  #for aperiodic (-npad/2+1,npad/2+1)
-    y = np.arange(-npad/2, npad/2)  
+    x = np.arange(-npad//2, npad//2+1)
+    y = np.arange(-npad//2, npad//2+1)
 
     a_row = np.zeros((h, 1, npad))
     a_column = np.zeros((h, npad, 1))
 
-    w = np.zeros((h, npad, npad))
+    w = np.zeros((h, npad+1, npad+1))
 
     for k in range(0, h, 1):
-        for i in range(0, npad, 1):
-            for j in range(0, npad, 1):
+        for i in range(0, npad+1, 1):
+            for j in range(0, npad+1, 1):
                 w[k, i, j] = w_value(x[i], y[j], l_inhibition[k], wmag) if h != 1 else w_value(x[i], y[j], l_inhibition, wmag)
+
+    if npad % 2 == 0:
+        mid = npad // 2
+        w = np.delete(w, mid, axis=1)
+        w = np.delete(w, mid, axis=2) 
 
     if wshift > 0:
         w_ltemp = np.delete(w, 0, 2)

@@ -9,21 +9,12 @@ from tqdm import tqdm
 ##########################################################################
 
 class GridNeuronNetwork:
-    def __init__(self, h,n,dt, tau, n_place_cells, sigma, x_dim, y_dim, dist_thresh, rand_weights_max, wmag, lmin, lmax, wshift, umag, urad, u_dv, u_vd, rinit, amag, falloff, falloff_low, falloff_high, npad, rnoise, vgain):
+    def __init__(self, h,n,dt, tau, wmag, lmin, lmax, wshift, umag, urad, u_dv, u_vd, rinit, r_field_base, amag, falloff, falloff_low, falloff_high, npad, rnoise, vgain):
         # Grid Cell Parameters
         self.h = h 
         self.n = n 
         self.dt = dt
         self.tau = tau
-
-        # Place Cell Parameters
-        self.n_place_cells = n_place_cells
-        self.sigma = sigma
-        # self.norm_const = 1 / (2 * np.pi * sigma**2)
-        self.x_dim = x_dim
-        self.y_dim = y_dim
-        self.dist_thresh = dist_thresh
-        self.rand_weights_max = rand_weights_max
 
         # Recurrent Inhibition Parameters
         self.wmag = wmag
@@ -39,6 +30,7 @@ class GridNeuronNetwork:
 
         # Initial value for rates for grid units
         self.rinit = rinit
+        self.r_field_base = r_field_base
 
         # Hippocampal Parameters
         self.amag = amag
@@ -78,13 +70,13 @@ def update_neuron_activity(GN,r, r_r, r_l, r_d, r_u,r_masks,r_fft_plan, r_ifft_p
         rwu_r = RN.convolve_both(r_fft_plan, r_ifft_plan, r_r, w_r, GN.umag, GN.npad, GN.h)
 
     # calculate fields
-    [r_l, r_field_l] = RN.calculate_field(r, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[0, :, :], a, 1.0-GN.vgain*vx, GN.h, GN.n, GN.npad)
-    [r_r, r_field_r] = RN.calculate_field(r, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[1, :, :], a, 1.0+GN.vgain*vx, GN.h, GN.n, GN.npad)
-    [r_u, r_field_u] = RN.calculate_field(r, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[2, :, :], a, 1.0+GN.vgain*vy, GN.h, GN.n, GN.npad)
-    [r_d, r_field_d] = RN.calculate_field(r, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[3, :, :], a, 1.0-GN.vgain*vy, GN.h, GN.n, GN.npad)
+    [r_l, r_field_l] = RN.calculate_field(r, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[0, :, :], a, -GN.vgain*vx, GN.h, GN.n, GN.npad)
+    [r_r, r_field_r] = RN.calculate_field(r, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[1, :, :], a, +GN.vgain*vx, GN.h, GN.n, GN.npad)
+    [r_u, r_field_u] = RN.calculate_field(r, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[2, :, :], a, +GN.vgain*vy, GN.h, GN.n, GN.npad)
+    [r_d, r_field_d] = RN.calculate_field(r, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[3, :, :], a, -GN.vgain*vy, GN.h, GN.n, GN.npad)
 
     # fix error r_field not being updated uniquely for each of the directions correctly
-    r_field = r_field_l + r_field_r + r_field_u + r_field_d
+    r_field = r_field_l + r_field_r + r_field_u + r_field_d + GN.r_field_base
 
     if GN.rnoise > 0.:
         for k in range(0, GN.h, 1):
@@ -162,13 +154,13 @@ def update_neuron_activity_with_traj(GN,r, r_r, r_l, r_d, r_u, r_masks,r_fft_pla
         rwu_r = RN.convolve_both(r_fft_plan, r_ifft_plan, r_r, w_r, GN.umag, GN.npad, GN.h)
 
     # calculate fields
-    [r_l, r_field_l] = RN.calculate_field(r, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[0, :, :], a, 1.0-GN.vgain*vx, GN.h, GN.n, GN.npad)
-    [r_r, r_field_r] = RN.calculate_field(r, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[1, :, :], a, 1.0+GN.vgain*vx, GN.h, GN.n, GN.npad)
-    [r_u, r_field_u] = RN.calculate_field(r, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[2, :, :], a, 1.0+GN.vgain*vy, GN.h, GN.n, GN.npad)
-    [r_d, r_field_d] = RN.calculate_field(r, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[3, :, :], a, 1.0-GN.vgain*vy, GN.h, GN.n, GN.npad)
+    [r_l, r_field_l] = RN.calculate_field(r, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[0, :, :], a, -GN.vgain*vx, GN.h, GN.n, GN.npad)
+    [r_r, r_field_r] = RN.calculate_field(r, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[1, :, :], a, +GN.vgain*vx, GN.h, GN.n, GN.npad)
+    [r_u, r_field_u] = RN.calculate_field(r, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[2, :, :], a, +GN.vgain*vy, GN.h, GN.n, GN.npad)
+    [r_d, r_field_d] = RN.calculate_field(r, rwu_l, rwu_r, rwu_d, rwu_u, r_masks[3, :, :], a, -GN.vgain*vy, GN.h, GN.n, GN.npad)
 
     # fix error r_field not being updated uniquely for each of the directions correctly
-    r_field = r_field_l + r_field_r + r_field_u + r_field_d
+    r_field = r_field_l + r_field_r + r_field_u + r_field_d + GN.r_field_base
 
     if GN.rnoise > 0.:
         for k in range(0, GN.h, 1):
