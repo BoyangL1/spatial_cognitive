@@ -14,11 +14,9 @@ import pandas as pd
 from tqdm import tqdm
 from sklearn.preprocessing import MinMaxScaler
 
-from transformer import *
-from BasicCNN import *
-from utils import *
-from EnDecoder import *
-from migrationProcess import *
+from .transformer import *
+from .BasicCNN import *
+from .EnDecoder import *
 
 class avril:
     """
@@ -344,40 +342,3 @@ class avril:
         self.e_params = params[0]
         self.q_params = params[1]
         self.params = params
-
-if __name__=="__main__":
-    data_dir = './data/'
-    model_dir = './model/'
-    coords_file_path = './data/coords_grid_data.pkl'
-    place_file_path = './data/place_grid_data.pkl'
-    
-    with open(coords_file_path, 'rb') as file:
-        coords_grid_data = pickle.load(file)
-
-    with open(place_file_path, 'rb') as file: 
-        place_grid_data = pickle.load(file)
-
-    # Paths for data files
-    before_migration_path = data_dir + 'before_migrt.json'
-    after_migration_path = data_dir + 'after_migrt.json'
-    full_trajectory_path = data_dir + 'all_traj.json'
-
-    inputs, targets_action, grid_code, action_dim, state_dim = loadTrajChain(before_migration_path, full_trajectory_path, coords_grid_data)
-    print(inputs.shape,targets_action.shape,grid_code.shape)
-    model = avril(inputs, targets_action, grid_code, state_dim, action_dim, state_only=True)
-
-    # NOTE: train the model
-    model.train(iters=1000)
-    model_save_path = model_dir + 'params_transformer.pickle'
-    model.modelSave(model_save_path)
-
-    # NOTE: compute rewards and values before migration
-    feature_file = data_dir + 'before_migrt_feature.csv'
-    model.loadParams('./model/params_transformer.pickle')
-    computeRewardOrValue(model, feature_file, data_dir + 'before_migrt_reward.csv', coords_grid_data, attribute_type='reward')
-    computeRewardOrValue(model, feature_file, data_dir + 'before_migrt_value.csv', coords_grid_data, attribute_type='value')
-
-    # NOTE: Compute rewards after migration
-    feature_file_all = data_dir + 'all_traj_feature.csv'
-    output_reward_path = data_dir + 'after_migrt_reward.csv'
-    afterMigrt(after_migration_path, before_migration_path, full_trajectory_path, coords_grid_data, feature_file_all, output_reward_path, model)

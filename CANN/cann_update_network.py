@@ -1,7 +1,7 @@
 import pyfftw
 import numpy as np
 from scipy import stats
-import cann_run_network as RN
+from . import cann_run_network as RN
 from tqdm import tqdm
 
 #########################################################################

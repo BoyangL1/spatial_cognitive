@@ -2,8 +2,8 @@ import haiku as hk
 
 import jax.numpy as np
 
-from transformer import *
-from BasicCNN import *
+from .transformer import *
+from .BasicCNN import *
 
 def encoder_model(inputs, grid_code, num_layers, num_heads, dff, rate, output_dim, rng, cnn_output_size = 16):
     # Process grid_code using CNN

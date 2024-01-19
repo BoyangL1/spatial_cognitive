@@ -82,9 +82,10 @@ if __name__ == "__main__":
 
     GN = UN.GridNeuronNetwork(h, n, dt, tau, wmag, lmin, lmax, wshift, umag, urad, u_dv, u_vd, rinit, r_field_base, amag, falloff, falloff_low, falloff_high,npad, rnoise, vgain)
     
-    file_name = './data/one_travel_chain.csv'
+    file_name = './data/one_travel_before.csv'
+    df = pd.read_csv(file_name)
     # Get Trajectory Data
-    [origin_grid,dest_grid,origin_x,origin_y,dest_x,dest_y,x,y,vx,vy] = TRAJ.get_trajectory(file_name)
+    [origin_grid,dest_grid,origin_x,origin_y,dest_x,dest_y,x,y,vx,vy] = TRAJ.get_trajectory(df)
     anchor_x = origin_x + dest_x
     anchor_y = origin_y + dest_y
     grid_list = origin_grid + dest_grid

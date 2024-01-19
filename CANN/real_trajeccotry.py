@@ -54,8 +54,7 @@ def calculate_velocity(row):
     return v
 
 
-def get_trajectory(file_name):
-    df = pd.read_csv(file_name)
+def get_trajectory(df):
     df['stime'] = pd.to_datetime(df['stime'])
     df['etime'] = pd.to_datetime(df['etime'])
 
@@ -63,9 +62,9 @@ def get_trajectory(file_name):
     df['direction'] = df.apply(calculate_direction, axis=1)
 
     df['velocity'] = df.apply(calculate_velocity, axis=1)
-    # Min-Max Normalization 0~1
-    min_velocity = df['velocity'].min()
-    max_velocity = df['velocity'].max()
+    # Min-Max Normalization
+    min_velocity = 0
+    max_velocity = 40
     df['velocity'] = df['velocity'].apply(lambda x: (x - min_velocity) / (max_velocity - min_velocity))
 
     df['direction_radians'] = df['direction'].apply(lambda x: math.radians(x))

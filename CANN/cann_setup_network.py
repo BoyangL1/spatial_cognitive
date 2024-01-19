@@ -2,7 +2,7 @@ import pyfftw
 import numpy as np
 from scipy import stats, io, signal, interpolate
 import time
-import quadflip as qp
+from . import quadflip as qp
 import os
 
 UNDEF = -999
