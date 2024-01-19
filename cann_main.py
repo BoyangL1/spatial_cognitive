@@ -2,12 +2,12 @@ import time
 import numpy as np
 from scipy import stats
 import matplotlib.pyplot as plt
-import cann_update_network as UN
-import cann_setup_network as SN
+import CANN.cann_update_network as UN
+import CANN.cann_setup_network as SN
 import pandas as pd
 # import geopandas as gpd
 # from shapely.geometry import LineString
-import real_trajeccotry as TRAJ
+import CANN.real_trajeccotry as TRAJ
 import pickle
 
 np.random.seed(1)
