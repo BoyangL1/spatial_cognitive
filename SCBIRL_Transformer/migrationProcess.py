@@ -387,5 +387,5 @@ def afterMigrt(afterMigrtFile, beforeMigrtFile, full_trajectory_path, coords_gri
 
     # Save results.
     resultsDf.to_csv(outputPath, index=False)
-    with open('./data/coords_grid_data.pkl', 'wb') as file:
+    with open('./data/coords_grid_data_all.pkl', 'wb') as file:
         pickle.dump(coords_grid_data, file)
