@@ -183,7 +183,7 @@ def updateCoordsGrid(last_grid_code,coords_grid_data,this_date, GN, w_r, w_l, w_
 
     singleneuronrec = False
     t_index = len(vx)
-    print('Update Grid Cell Model with Real Trajectory!')
+    print(f'Update Grid Cell Model with {this_date} Trajectory!')
     [r, r_field, r_r, r_l, r_d, r_u, sna_eachlayer, coords_grid_dic, _ ] = UN.flow_full_model(
         GN, anchor_list,grid_list,x,y,vx, vy, t_index, a, r, r_r, r_l, r_d, r_u, r_masks,singleneuronrec, w_r, w_l, w_u, w_d)
     coords_grid_data.update(coords_grid_dic)
