@@ -374,7 +374,7 @@ def afterMigrt(afterMigrtFile, beforeMigrtFile, full_trajectory_path, coords_gri
         rewardValues,coords_grid_data = processAfterMigrationData(train_chain, stateAttribute, coords_grid_data, model, visitedState, id_coords, coords_fnid, actionDim, GN, w_r, w_l, w_u, w_d, a, r, r_r, r_l, r_d, r_masks)
 
         # Train the model.
-        model.train(iters=1000,loss_threshold=0.01)
+        model.train(iters=1000,loss_threshold=0.001)
 
         # Save the current model state.
         modelSavePath = "./data/after_migrt/model/" + str(train_chain[-1].date) + ".pickle"

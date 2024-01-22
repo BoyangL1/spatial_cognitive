@@ -22,7 +22,7 @@ if __name__ =="__main__":
     model = SIRLT.avril(inputs, targets_action, grid_code, state_dim, action_dim, state_only=True)
 
     # NOTE: train the model before migration
-    model.train(iters=1000)
+    model.train(iters=1000,loss_threshold=0.001)
     model_save_path = model_dir + 'params_transformer.pickle'
     model.modelSave(model_save_path)
 
