@@ -100,10 +100,12 @@ class avril:
     
     def loadParams(self,model_path):
         print("load params from {}!".format(model_path))
-        with open(model_path, 'rb') as f:
-            self.params = pickle.load(f)     
+        with open(model_path, 'rb') as f:    
             self.load_params = True
+            self.params = pickle.load(f) 
             self.pre_params = self.params
+            self.e_params = self.params[0]
+            self.q_params = self.params[1]
 
     def reward(self,state,grid_code):
         #  Returns reward function parameters for a given state
