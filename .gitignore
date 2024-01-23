@@ -132,3 +132,4 @@ dmypy.json
 test.py
 test.ipynb
 data/*
+data_pe/*
