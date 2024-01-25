@@ -4,7 +4,7 @@ import numpy as np
 import os
 from tqdm import tqdm
 
-file_path = './data/coords_grid_data_all.pkl'
+file_path = './data/coords_grid_data.pkl'
 
 # Open the file in binary read mode
 with open(file_path, 'rb') as file:

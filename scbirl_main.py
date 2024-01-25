@@ -32,7 +32,7 @@ if __name__ =="__main__":
     SIRLP.computeRewardOrValue(model, feature_file, data_dir + 'before_migrt_reward.csv', coords_grid_data, attribute_type='reward')
     SIRLP.computeRewardOrValue(model, feature_file, data_dir + 'before_migrt_value.csv', coords_grid_data, attribute_type='value')
 
-    # NOTE: Compute rewards after migration
+    # # NOTE: Compute rewards after migration
     feature_file_all = data_dir + 'all_traj_feature.csv'
     output_reward_path = data_dir + 'after_migrt_reward.csv'
     SIRLP.afterMigrt(after_migration_path, before_migration_path, full_trajectory_path, coords_grid_data, feature_file_all, output_reward_path, model)

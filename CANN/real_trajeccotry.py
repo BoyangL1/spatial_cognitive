@@ -39,7 +39,7 @@ def calculate_direction(row):
     brng = math.degrees(brng)
 
     # normalize
-    brng = (brng + 360) % 360
+    brng = (brng + 360) % 360 
     brng = (brng + 90) % 360  # east = 0
 
     return brng
@@ -64,19 +64,23 @@ def get_trajectory(df):
     df['velocity'] = df.apply(calculate_velocity, axis=1)
     # Min-Max Normalization
     min_velocity = 0
-    max_velocity = 40
+    max_velocity = 10
     df['velocity'] = df['velocity'].apply(lambda x: (x - min_velocity) / (max_velocity - min_velocity))
 
     df['direction_radians'] = df['direction'].apply(lambda x: math.radians(x))
-    df['vx'] = df.apply(lambda row: row.velocity *
+    df['vleft'] = df.apply(lambda row: -row.velocity *
                         math.cos(row.direction_radians), axis=1)
-    df['vy'] = df.apply(lambda row: row.velocity *
+    df['vright'] = df.apply(lambda row: row.velocity *
+                        math.cos(row.direction_radians), axis=1)
+    df['vup'] = df.apply(lambda row: row.velocity *
+                        math.sin(row.direction_radians), axis=1)
+    df['vdown'] = df.apply(lambda row: -row.velocity *
                         math.sin(row.direction_radians), axis=1)
 
     result_df = pd.DataFrame()
-    for index, row in tqdm(df.iterrows(), total=len(df)):
+    for index, row in tqdm(df.iterrows(), total=len(df),desc='Process Trajectory'):
         # time interpolation
-        time_range = pd.date_range(start=row['stime'], end=row['etime'], freq='60S')
+        time_range = pd.date_range(start=row['stime'], end=row['etime'], freq='10S')
         # create new dataframe
         new_rows = pd.DataFrame({
             'lambda_o': np.nan, 
@@ -85,8 +89,10 @@ def get_trajectory(df):
             'phi_d': row['phi_d'],
             'start_time': time_range,
             'end_time': row['etime'],
-            'vx': row['vx'],
-            'vy': row['vy']
+            'vleft': row['vleft'],
+            'vright': row['vright'],
+            'vup': row['vup'],
+            'vdown': row['vdown']
         })
 
         new_rows['lambda_o'] = np.linspace(row['lambda_o'], row['lambda_d'], len(time_range))
@@ -94,10 +100,9 @@ def get_trajectory(df):
         
         result_df = pd.concat([result_df, new_rows], ignore_index=True)
     
-    result_df.to_csv('./data/one_grid_lat_lon.csv',index=False)
-    
-    return df.grid_id_o.tolist(),df.grid_id_d.tolist(),df.lambda_o.tolist(),df.phi_o.tolist(),df.lambda_d.tolist(),df.phi_d.tolist(),result_df.lambda_o.tolist(), result_df.phi_o.tolist(), result_df.vx.tolist(), result_df.vy.tolist()
+    return df.grid_id_o.tolist(),df.grid_id_d.tolist(),df.lambda_o.tolist(),df.phi_o.tolist(),df.lambda_d.tolist(),df.phi_d.tolist(),result_df.lambda_o.tolist(), result_df.phi_o.tolist(), result_df.vleft.tolist(), result_df.vright.tolist(), result_df.vup.tolist(), result_df.vdown.tolist()
 
 if __name__=="__main__":
-    file_name = './data/one_travel_chain.csv'
-    get_trajectory(file_name)
+    file_name = './one_travel_chain.csv'
+    df = pd.read_csv(file_name)
+    get_trajectory(df)

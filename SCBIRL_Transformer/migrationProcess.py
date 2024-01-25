@@ -11,9 +11,8 @@ from .BasicCNN import *
 from .utils import *
 from .EnDecoder import *
 
-from CANN import cann_setup_network as SN
 from CANN import real_trajeccotry as TRAJ
-from CANN import cann_update_network as UN
+from CANN import periodic_cann as UP
 
 def computeRewardOrValue(model, input_path, output_path, coords_grid_data, attribute_type='value'):
     """
@@ -44,9 +43,7 @@ def computeRewardOrValue(model, input_path, output_path, coords_grid_data, attri
         if coords not in coords_grid_data.keys():
             rewardValues.append((coords,0))
             continue
-        this_coords_grid = coords_grid_data[coords]
-        destination_grid = np.zeros_like(this_coords_grid) # if has specific destination, change this line to real destination grid code
-        grid_code = onp.concatenate((this_coords_grid, destination_grid), axis=0)
+        grid_code = coords_grid_data[coords]
         # get state attribute of this fnid
         state = getStateRow(state_attribute,fnid)
         # add three dimension
@@ -124,9 +121,7 @@ def processBeforeMigrationData(state_attribute, visitedState, coords_grid_data, 
         if coords not in visitedState:
             actionProb = [0 for _ in range(actionDim)]
             continue
-        this_coords_grid = coords_grid_data[coords]
-        destination_grid = np.zeros_like(this_coords_grid) # if has specific destination, change this line to real destination grid code
-        grid_code = onp.concatenate((this_coords_grid, destination_grid), axis=0)
+        grid_code = coords_grid_data[coords]
         # add twree dimension
         grid_code = np.expand_dims(np.expand_dims(np.expand_dims(grid_code, axis=0), axis=0), axis=0)
         state = np.expand_dims(np.expand_dims(np.expand_dims(state, axis=0), axis=0),axis=0)
@@ -153,14 +148,9 @@ def processBeforeMigrationData(state_attribute, visitedState, coords_grid_data, 
     dfResults = pd.DataFrame(beforeMigrtTrans, columns=columns)
     dfResults.to_csv(f"./data/before_migrt_transProb.csv", index=False)
 
-def updateCoordsGrid(last_grid_code,coords_grid_data,this_date, GN, w_r, w_l, w_u, w_d, a, r_r, r_l, r_d, r_u, r_masks):
+def updateCoordsGrid(last_grid_code,coords_grid_data,this_date, GM):
 
     r = last_grid_code
-    for k in range(0, GN.h, 1):
-        r_l[k, :, :] = r[k, :, :]*r_masks[0, :, :]
-        r_r[k, :, :] = r[k, :, :]*r_masks[1, :, :]
-        r_u[k, :, :] = r[k, :, :]*r_masks[2, :, :]
-        r_d[k, :, :] = r[k, :, :]*r_masks[3, :, :]
     
     file_name = './data/one_travel_chain.csv'
     df = pd.read_csv(file_name)
@@ -170,7 +160,7 @@ def updateCoordsGrid(last_grid_code,coords_grid_data,this_date, GN, w_r, w_l, w_
     df.drop(columns=['is_matching_date', 'previous_is_matching'], inplace=True) # Drop the marker columns
 
     # Get Trajectory Data
-    [origin_grid,dest_grid,origin_x,origin_y,dest_x,dest_y,x,y,vx,vy] = TRAJ.get_trajectory(df)
+    [origin_grid,dest_grid,origin_x,origin_y,dest_x,dest_y,x,y,vright,vleft,vup,vdown] = TRAJ.get_trajectory(df)
     anchor_x = origin_x + dest_x
     anchor_y = origin_y + dest_y
     grid_list = origin_grid + dest_grid
@@ -181,65 +171,48 @@ def updateCoordsGrid(last_grid_code,coords_grid_data,this_date, GN, w_r, w_l, w_
     anchor_list = list(unique_dict.keys())
     grid_list = list(unique_dict.values())
 
-    singleneuronrec = False
-    t_index = len(vx)
     print(f'Update Grid Cell Model with {this_date} Trajectory!')
-    [r, r_field, r_r, r_l, r_d, r_u, sna_eachlayer, coords_grid_dic, _ ] = UN.flow_full_model(
-        GN, anchor_list,grid_list,x,y,vx, vy, t_index, a, r, r_r, r_l, r_d, r_u, r_masks,singleneuronrec, w_r, w_l, w_u, w_d)
+    [_,r,coords_grid_dic,_]=UP.runCann(GM.dt, GM.tau, GM.n, anchor_list,grid_list,x,y, vleft, vright, vup, vdown, GM.a_envelope, GM.alpha, r, GM.r_r_mask, GM.r_l_mask, GM.r_u_mask, GM.r_d_mask, GM.w_r_small, GM.w_l_small, GM.w_d_small, GM.w_u_small, [GM.n//2,GM.n//2])
+    
     coords_grid_data.update(coords_grid_dic)
     return coords_grid_data
 
+class GridModel:
+    def __init__(self):
+        print("Initialize grid model")
+        self.n = 2**7  # number of neurons
+        self.h_grid = 8  # layers of grid cells
+        self.dt = 0.5
+        self.tau = 5  # neuron time constant
+
+        # Envelope and Weight Matrix Parameters
+        self.wmag = 2.4
+        self.wtphase = 2
+        self.lmin = 8
+        self.lmax = 32
+        self.lexp = -1
+        self.alpha = 1
+
+        # Envelope and Weight Matrix parameters
+        self.x = np.arange(-self.n/2, self.n/2)
+        self.envelope_all = True
+        if not self.envelope_all:
+            self.a_envelope = np.exp(-4 * (np.outer(self.x**2, np.ones(self.n)) + np.outer(np.ones(self.n), self.x**2)) / (self.n/2)**2)
+        else:
+            self.a_envelope = 0.6 * np.ones((self.n, self.n))
+
+        # initialize weight matrix, input envelope and r mask
+        self.l_inhibition = UP.setInhibLength(self.h_grid, self.lexp, self.lmin, self.lmax)
+        self.w, self.w_u, self.w_d, self.w_l, self.w_r, self.w_u_small, self.w_d_small, self.w_l_small, self.w_r_small, self.r_l_mask, self.r_r_mask, self.r_u_mask, self.r_d_mask = UP.initializeWeight(self.n, self.h_grid, self.l_inhibition, self.wmag, self.wtphase)
+
+        # initialize grid pattern
+        self.r = np.zeros((self.h_grid, self.n, self.n))
+
 def initializeGridModel():
-    print("Initialize grid model")
-    h = 8  
-    n = 128  
-    dt = 1.0
-    tau = 10.0 
+    GM = GridModel()
+    return GM
 
-    # Recurrent Inhibition Parameters
-    wmag = 2.4  
-    lmin = 7  
-    lmax =  41 
-    lexp = -1 
-    wshift = 1
-
-    # Coupling Parameters
-    umag = -0.001  # for spike model, mean(w), connection stength from other layer
-    urad = 4.0  # for rate model
-    u_dv = 0  # 1 corresponds to dorsal to ventral
-    u_vd = 0  # 1 corresponds to ventral to dorsal
-
-    # Initial value for rates for grid units
-    rinit = 1e-3
-    r_field_base = 0.6
-
-    # Hippocampal Parameters
-    amag = .6  # now trying . 6 from Alex's paper, was 1;#trying .7 instead of .5 due to particularly low activity in network when checked #1 in rate model
-    falloff = 4.0  # 4.0 in rate model
-    falloff_low = 2.0
-    falloff_high = -999  
-
-    # system noise
-    rnoise = 0.0
-    vgain = .4
-
-    GN = UN.GridNeuronNetwork(h, n, dt, tau, wmag, lmin, lmax, wshift, umag, urad, u_dv, u_vd, rinit, r_field_base, amag, falloff, falloff_low, falloff_high, n, rnoise, vgain)
-    # inhibition length scales
-    l = SN.set_inhib_length(h, lexp, lmin, lmax)
-    # inhibitory kernel overall and for each directional subpopulation
-    [w, w_r, w_l, w_u, w_d] = SN.setup_recurrent(h, n, l, wmag, wshift)
-    a = SN.setup_input(amag, n, falloff_high, falloff_low, falloff)
-
-    r_l, r_r, r_u, r_d = onp.zeros((4, h, n, n))
-    r_masks = onp.zeros((4, n, n))
-    r_masks[0, 0:n:2, 0:n:2] = 1
-    r_masks[1, 1:n:2, 1:n:2] = 1
-    r_masks[2, 0:n:2, 1:n:2] = 1
-    r_masks[3, 1:n:2, 0:n:2] = 1
-
-    return GN, w_r, w_l, w_u, w_d, a, r_r, r_l, r_d, r_u, r_masks
-
-def processAfterMigrationData(tc, stateAttribute, coords_grid_data, model, visitedState, id_coords, coords_fnid, actionDim, GN, w_r, w_l, w_u, w_d, a, r, r_r, r_l, r_d, r_masks):
+def processAfterMigrationData(tc, stateAttribute, coords_grid_data, model, visitedState, id_coords, coords_fnid, actionDim, GM):
     """
     Process data after migration, including calculating rewards and transition probabilities.
 
@@ -257,7 +230,7 @@ def processAfterMigrationData(tc, stateAttribute, coords_grid_data, model, visit
     """
     last_coords = tc[-2].travel_chain[-1]
     last_grid_code = coords_grid_data[tuple(last_coords)]
-    coords_grid_data = updateCoordsGrid(last_grid_code,coords_grid_data,tc[-1].date,GN, w_r, w_l, w_u, w_d, a, r, r_r, r_l, r_d, r_masks)
+    coords_grid_data = updateCoordsGrid(last_grid_code,coords_grid_data,tc[-1].date, GM)
 
     # Preprocess trajectory data and update visited states
     stateNextState, actionNextAction, gridNextgrid = processTrajectoryData(tc, stateAttribute, model.s_dim, coords_grid_data)
@@ -287,9 +260,7 @@ def processAfterMigrationData(tc, stateAttribute, coords_grid_data, model, visit
             continue
         # Extract fnid and state information from the row.
         state = getStateRow(stateAttribute, fnid)
-        this_coords_grid = coords_grid_data[coords]
-        destination_grid = np.zeros_like(this_coords_grid) # if has specific destination, change this line to real destination grid code
-        grid_code = onp.concatenate((this_coords_grid, destination_grid), axis=0)
+        grid_code = coords_grid_data[coords]
         # add twree dimension
         grid_code = np.expand_dims(np.expand_dims(np.expand_dims(grid_code, axis=0), axis=0), axis=0)
         state = np.expand_dims(np.expand_dims(np.expand_dims(state, axis=0), axis=0),axis=0)
@@ -358,7 +329,7 @@ def afterMigrt(afterMigrtFile, beforeMigrtFile, full_trajectory_path, coords_gri
     preDate = 0 # load preDate model parameters
     memory_buffer = 10 # days
 
-    GN, w_r, w_l, w_u, w_d, a, r, r_r, r_l, r_d, r_masks = initializeGridModel()
+    GM = initializeGridModel()
     for i in range(len(trajChains)):
         if preDate:
             modelPath = os.path.join(modelDir, f"{preDate}.pickle")
@@ -371,7 +342,7 @@ def afterMigrt(afterMigrtFile, beforeMigrtFile, full_trajectory_path, coords_gri
         train_chain = before_chain + [trajChains[i]]
 
         # Process and calculate reward values after migration.
-        rewardValues,coords_grid_data = processAfterMigrationData(train_chain, stateAttribute, coords_grid_data, model, visitedState, id_coords, coords_fnid, actionDim, GN, w_r, w_l, w_u, w_d, a, r, r_r, r_l, r_d, r_masks)
+        rewardValues,coords_grid_data = processAfterMigrationData(train_chain, stateAttribute, coords_grid_data, model, visitedState, id_coords, coords_fnid, actionDim, GM)
 
         # Train the model.
         model.train(iters=1000,loss_threshold=0.001)

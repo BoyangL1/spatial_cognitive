@@ -151,16 +151,12 @@ def processSingleTrajectory(tc, t, state_attribute, s_dim, destination, place_gr
 
         # get grid code of state and destination,dim(8,128,128)
         this_grid = place_grid_data[tuple(this_state)]
-        destination_grid = place_grid_data[tuple(destination)]
         next_grid = place_grid_data[tuple(next_state)]
-        # combined destination grid code with current grid code
-        this_destination_grid = onp.concatenate((this_grid, destination_grid), axis=0)
-        next_destination_grid = onp.concatenate((next_grid, destination_grid), axis=0)
         # save to s_grid_s
-        grid_shape = this_destination_grid.shape
+        grid_shape = this_grid.shape
         s_gird_s = onp.zeros((2,*grid_shape))
-        s_gird_s[0, :] = this_destination_grid
-        s_gird_s[1, :] = next_destination_grid
+        s_gird_s[0, :] = this_grid
+        s_gird_s[1, :] = next_grid
 
         # action
         a_n_a = onp.zeros((2, 1))   
@@ -175,14 +171,11 @@ def processSingleTrajectory(tc, t, state_attribute, s_dim, destination, place_gr
         # get grid code of state and destination,dim(8,128,128)
         this_grid = place_grid_data[tuple(this_state)]
         destination_grid = place_grid_data[tuple(destination)]
-        # combined destination grid code with current grid code
-        this_destination_grid = onp.concatenate((this_grid, destination_grid), axis=0)
-        next_destination_grid = onp.zeros_like(this_destination_grid)
         # save to s_grid_s
-        grid_shape = this_destination_grid.shape
+        grid_shape = this_grid.shape
         s_gird_s = onp.zeros((2,*grid_shape))
-        s_gird_s[0, :] = this_destination_grid
-        s_gird_s[1, :] = next_destination_grid
+        s_gird_s[0, :] = this_grid
+        s_gird_s[1, :] = np.zeros_like(this_grid)
 
         a_n_a = onp.zeros((2, 1))
         a_n_a[0] = -1
