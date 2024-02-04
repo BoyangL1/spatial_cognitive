@@ -34,7 +34,7 @@ class avril:
         action_dim: int,
         state_only: bool = True,
 
-        cnn_output: int = 16,
+        cnn_output: int = 14,
         num_layers: int = 2,
         num_heads: int = 2,
         dff = 28,

@@ -168,9 +168,8 @@ def processSingleTrajectory(tc, t, state_attribute, s_dim, destination, place_gr
         s_n_s = onp.zeros((2, s_dim))
         s_n_s[0, :] = getStateRow(state_attribute, this_fnid)
 
-        # get grid code of state and destination,dim(8,128,128)
+        # get grid code of state ,dim(8,128,128)
         this_grid = place_grid_data[tuple(this_state)]
-        destination_grid = place_grid_data[tuple(destination)]
         # save to s_grid_s
         grid_shape = this_grid.shape
         s_gird_s = onp.zeros((2,*grid_shape))

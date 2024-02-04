@@ -5,11 +5,12 @@ import jax.numpy as np
 from .transformer import *
 from .BasicCNN import *
 
-def encoder_model(inputs, grid_code, num_layers, num_heads, dff, rate, output_dim, rng, cnn_output_size = 16):
+def encoder_model(inputs, grid_code, num_layers, num_heads, dff, rate, output_dim, rng, cnn_output_size = 14):
     # Process grid_code using CNN
     cnn_processed_grid_code = process_grid_code(grid_code, cnn_output_size)
     # Combine inputs and flattened grid_code
-    inputs = np.concatenate([inputs, cnn_processed_grid_code], axis=-1)
+    # inputs = np.concatenate([inputs, cnn_processed_grid_code], axis=-1)
+    inputs = inputs + cnn_processed_grid_code
 
     # Initialize transformer layer
     transformer_layers = [TransformerLayer(inputs.shape[-1], num_heads, dff, rate) for _ in range(num_layers)]
