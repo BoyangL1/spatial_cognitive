@@ -66,6 +66,6 @@ if __name__ =="__main__":
     with open('./data/coords_grid_data.pkl', 'wb') as file:
         pickle.dump(coords_grid_dic, file)
     
-    print("Saving place corresponding grid cell networks")
-    with open('./data/place_grid_data.pkl', 'wb') as file:
-        pickle.dump(place_grid_dic, file)
+    # print("Saving place corresponding grid cell networks")
+    # with open('./data/place_grid_data.pkl', 'wb') as file:
+    #     pickle.dump(place_grid_dic, file)

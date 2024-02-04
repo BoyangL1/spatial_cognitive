@@ -194,12 +194,12 @@ class GridModel:
         self.alpha = 1
 
         # Envelope and Weight Matrix parameters
-        self.x = np.arange(-self.n/2, self.n/2)
+        self.x = onp.arange(-self.n/2, self.n/2)
         self.envelope_all = True
         if not self.envelope_all:
-            self.a_envelope = np.exp(-4 * (np.outer(self.x**2, np.ones(self.n)) + np.outer(np.ones(self.n), self.x**2)) / (self.n/2)**2)
+            self.a_envelope = onp.exp(-4 * (onp.outer(self.x**2, onp.ones(self.n)) + onp.outer(onp.ones(self.n), self.x**2)) / (self.n/2)**2)
         else:
-            self.a_envelope = 0.6 * np.ones((self.n, self.n))
+            self.a_envelope = 0.6 * onp.ones((self.n, self.n))
 
         # initialize weight matrix, input envelope and r mask
         self.l_inhibition = UP.setInhibLength(self.h_grid, self.lexp, self.lmin, self.lmax)
@@ -345,7 +345,7 @@ def afterMigrt(afterMigrtFile, beforeMigrtFile, full_trajectory_path, coords_gri
         rewardValues,coords_grid_data = processAfterMigrationData(train_chain, stateAttribute, coords_grid_data, model, visitedState, id_coords, coords_fnid, actionDim, GM)
 
         # Train the model.
-        model.train(iters=1000,loss_threshold=0.001)
+        model.train(iters=1000,loss_threshold=0.01)
 
         # Save the current model state.
         modelSavePath = "./data/after_migrt/model/" + str(train_chain[-1].date) + ".pickle"

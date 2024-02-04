@@ -38,9 +38,8 @@ def calculate_direction(row):
     # Turn azimuth angle to degree
     brng = math.degrees(brng)
 
-    # normalize
-    brng = (brng + 360) % 360 
-    brng = (brng + 90) % 360  # east = 0
+    # Normalize to 0-360 degrees
+    brng = (brng + 360) % 360
 
     return brng
 
@@ -69,13 +68,13 @@ def get_trajectory(df):
 
     df['direction_radians'] = df['direction'].apply(lambda x: math.radians(x))
     df['vleft'] = df.apply(lambda row: -row.velocity *
-                        math.cos(row.direction_radians), axis=1)
+                        math.sin(row.direction_radians), axis=1)
     df['vright'] = df.apply(lambda row: row.velocity *
-                        math.cos(row.direction_radians), axis=1)
+                        math.sin(row.direction_radians), axis=1)
     df['vup'] = df.apply(lambda row: row.velocity *
-                        math.sin(row.direction_radians), axis=1)
+                        math.cos(row.direction_radians), axis=1)
     df['vdown'] = df.apply(lambda row: -row.velocity *
-                        math.sin(row.direction_radians), axis=1)
+                        math.cos(row.direction_radians), axis=1)
 
     result_df = pd.DataFrame()
     for index, row in tqdm(df.iterrows(), total=len(df),desc='Process Trajectory'):
