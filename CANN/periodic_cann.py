@@ -63,11 +63,6 @@ def initializeWeight(n, h_grid, l_inhibition, wmag, wtphase):
     w_l = fft2(w_lshift, (big, big))
     w_r = fft2(w_rshift, (big, big))
 
-    w_u_small = fft2(fftshift(w_ushift))
-    w_d_small = fft2(fftshift(w_dshift))
-    w_l_small = fft2(fftshift(w_lshift))
-    w_r_small = fft2(fftshift(w_rshift))
-
     # Block matrices used for identifying all neurons of one preferred firing direction
     dim = n // 2
     r_l_mask = np.tile(np.array([[1, 0], [0, 0]]), (dim, dim))
@@ -75,7 +70,7 @@ def initializeWeight(n, h_grid, l_inhibition, wmag, wtphase):
     r_u_mask = np.tile(np.array([[0, 1], [0, 0]]), (dim, dim))
     r_d_mask = np.tile(np.array([[0, 0], [1, 0]]), (dim, dim))
 
-    return w, w_u, w_d, w_l, w_r, w_u_small, w_d_small, w_l_small, w_r_small, r_l_mask, r_r_mask, r_u_mask, r_d_mask
+    return w, w_u, w_d, w_l, w_r, r_l_mask, r_r_mask, r_u_mask, r_d_mask
 
 def initializeGrid(n, tau, dt, nflow, vector, left, right, up, down, v_envelope, r_origin, r_l, r_r, r_u, r_d, w_r_origin, w_l_origin, w_d_origin, w_u_origin, grid_show=False):
     # Create a function to update r
@@ -93,7 +88,7 @@ def initializeGrid(n, tau, dt, nflow, vector, left, right, up, down, v_envelope,
         return np.minimum(10, (dt / tau) * (5 * fr - r) + r)
 
     # Iterate over k and iter
-    for k in tqdm(range(8), desc='Initialize grid pattern'):
+    for k in tqdm(range(len(r_origin)), desc='Initialize grid pattern'):
         r = r_origin[k,:,:]
         w_r = w_r_origin[k,:,:]
         w_l = w_l_origin[k,:,:]
@@ -115,7 +110,7 @@ def initializeGrid(n, tau, dt, nflow, vector, left, right, up, down, v_envelope,
 
     return r_origin
 
-def runCann(dt, tau, n, anchor_list, grid_list, x, y, vleft, vright, vup, vdown, v_envelope, alpha, r_origin, r_r, r_l, r_u, r_d, w_r_small_origin, w_l_small_origin, w_d_small_origin, w_u_small_origin, sNeuron, useSpiking = True, grid_show=False):
+def runCann(dt, tau, n, anchor_list, x, y, vleft, vright, vup, vdown, v_envelope, alpha, r_origin, r_r, r_l, r_u, r_d, w_r_origin, w_l_origin, w_d_origin, w_u_origin, sNeuron, useSpiking = True, grid_show = True):
     """
     Run the Continuous Attractor Neural Network (CANN) simulation.
 
@@ -132,19 +127,18 @@ def runCann(dt, tau, n, anchor_list, grid_list, x, y, vleft, vright, vup, vdown,
     r: Final state of the neural grid.
     """
     sampling_length = len(vleft)
-    sNeuronResponse = np.zeros_like(vleft)
-    grid_layer = 3
+    grid_layer = 0
     coords_grid_dic = dict()
-    place_grid_dic = dict()
+    sNeuronResponse = [0.0]*sampling_length
 
     for iter in tqdm(range(sampling_length), desc='Processing'):
-        for k in range(8):
+    # for iter in range(sampling_length):
+        for k in range(len(r_origin)):
             r = r_origin[k, :, :]
-            s = r
-            w_r_small = w_r_small_origin[k, :, :]
-            w_l_small = w_l_small_origin[k, :, :]
-            w_d_small = w_d_small_origin[k, :, :]
-            w_u_small = w_u_small_origin[k, :, :]
+            w_r = w_r_origin[k, :, :]
+            w_l = w_l_origin[k, :, :]
+            w_d = w_d_origin[k, :, :]
+            w_u = w_u_origin[k, :, :]
 
             rfield = v_envelope * ((1 + alpha * vright[iter]) * r_r +
                                 (1 + alpha * vleft[iter]) * r_l +
@@ -152,36 +146,33 @@ def runCann(dt, tau, n, anchor_list, grid_list, x, y, vleft, vright, vup, vdown,
                                 (1 + alpha * vdown[iter]) * r_d)
 
             # Convolution
-            convolution = np.real(ifft2(fft2(r * r_r) * w_r_small +
-                                        fft2(r * r_l) * w_l_small +
-                                        fft2(r * r_u) * w_d_small +
-                                        fft2(r * r_d) * w_u_small))
+            convolution = np.real(ifft2(
+                fft2(r * r_r, s=(2*n, 2*n)) * w_r +
+                fft2(r * r_l, s=(2*n, 2*n)) * w_l +
+                fft2(r * r_d, s=(2*n, 2*n)) * w_d +
+                fft2(r * r_u, s=(2*n, 2*n)) * w_u
+            ))
 
-            rfield += convolution
+            rfield += convolution[n//2:3*n//2, n//2:3*n//2]
 
             # Neural Transfer Function
             fr = np.where(rfield > 0, rfield, 0)
 
-            # Neuron dynamics (Eq. 1)
+            # Neuron dynamics
             r_old = r
             r_new = np.minimum(10, (dt / tau) * (5 * fr - r_old) + r_old)
             r = r_new
 
-            # Track single neuron response
-            if fr[sNeuron[0], sNeuron[1]] > 0:
-                sNeuronResponse[iter] = 1
-
             if useSpiking:
                 spike = rfield * dt > np.random.rand(n, n)
-                s += (dt / tau) * (-s + (tau / dt) * spike)
-                r = s
+                r += (dt / tau) * (-r + (tau / dt) * spike)
                 if k == grid_layer:
-                    sNeuronResponse[iter] = spike[sNeuron[0], sNeuron[1]]
+                    sNeuronResponse[iter] = r[sNeuron[0], sNeuron[1]]
 
             if grid_show and iter % 20 == 0 and k==grid_layer:
                 plt.imshow(r, vmin=0, vmax=2, cmap='hot')
                 plt.colorbar()
-                plt.title(f'Neural Population Activity - Iteration {iter}, Layer {k}')
+                plt.title(f'Neural Population Activity - Iteration {iter}, Layer {k+1}')
                 plt.draw()
                 plt.pause(0.01)
                 plt.clf()
@@ -189,9 +180,6 @@ def runCann(dt, tau, n, anchor_list, grid_list, x, y, vleft, vright, vup, vdown,
             r_origin[k, :, :] = r
         
         if (x[iter],y[iter]) in anchor_list:
-            index = anchor_list.index((x[iter], y[iter]))
-            grid_id = grid_list[index]
-            coords_grid_dic[(x[iter], y[iter])] = r_origin
-            place_grid_dic[grid_id] = r_origin
+            coords_grid_dic[(x[iter], y[iter])] = np.copy(r_origin)
 
-    return sNeuronResponse, r, coords_grid_dic, place_grid_dic
+    return sNeuronResponse, r, coords_grid_dic

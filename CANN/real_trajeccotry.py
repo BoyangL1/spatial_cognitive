@@ -63,7 +63,7 @@ def get_trajectory(df):
     df['velocity'] = df.apply(calculate_velocity, axis=1)
     # Min-Max Normalization
     min_velocity = 0
-    max_velocity = 10
+    max_velocity = 40
     df['velocity'] = df['velocity'].apply(lambda x: (x - min_velocity) / (max_velocity - min_velocity))
 
     df['direction_radians'] = df['direction'].apply(lambda x: math.radians(x))

@@ -172,7 +172,7 @@ def updateCoordsGrid(last_grid_code,coords_grid_data,this_date, GM):
     grid_list = list(unique_dict.values())
 
     print(f'Update Grid Cell Model with {this_date} Trajectory!')
-    [_,r,coords_grid_dic,_]=UP.runCann(GM.dt, GM.tau, GM.n, anchor_list,grid_list,x,y, vleft, vright, vup, vdown, GM.a_envelope, GM.alpha, r, GM.r_r_mask, GM.r_l_mask, GM.r_u_mask, GM.r_d_mask, GM.w_r_small, GM.w_l_small, GM.w_d_small, GM.w_u_small, [GM.n//2,GM.n//2])
+    [_,r,coords_grid_dic]=UP.runCann(GM.dt, GM.tau, GM.n, anchor_list,x,y, vleft, vright, vup, vdown, GM.a_envelope, GM.alpha, r, GM.r_r_mask, GM.r_l_mask, GM.r_u_mask, GM.r_d_mask, GM.w_r, GM.w_l, GM.w_d, GM.w_u, [GM.n//2,GM.n//2])
     
     coords_grid_data.update(coords_grid_dic)
     return coords_grid_data
@@ -203,7 +203,7 @@ class GridModel:
 
         # initialize weight matrix, input envelope and r mask
         self.l_inhibition = UP.setInhibLength(self.h_grid, self.lexp, self.lmin, self.lmax)
-        self.w, self.w_u, self.w_d, self.w_l, self.w_r, self.w_u_small, self.w_d_small, self.w_l_small, self.w_r_small, self.r_l_mask, self.r_r_mask, self.r_u_mask, self.r_d_mask = UP.initializeWeight(self.n, self.h_grid, self.l_inhibition, self.wmag, self.wtphase)
+        self.w, self.w_u, self.w_d, self.w_l, self.w_r, self.r_l_mask, self.r_r_mask, self.r_u_mask, self.r_d_mask = UP.initializeWeight(self.n, self.h_grid, self.l_inhibition, self.wmag, self.wtphase)
 
         # initialize grid pattern
         self.r = np.zeros((self.h_grid, self.n, self.n))

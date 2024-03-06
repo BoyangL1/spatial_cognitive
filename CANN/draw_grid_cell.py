@@ -9,7 +9,7 @@ file_path = './data/coords_grid_data.pkl'
 # Open the file in binary read mode
 with open(file_path, 'rb') as file:
     # Load the contents from the file
-    data = pickle.load(file)
+    coords_data = pickle.load(file)
 
 def visualize_and_save_grid_cells(data, directory):
     """
@@ -23,7 +23,7 @@ def visualize_and_save_grid_cells(data, directory):
     for i, (key, value) in enumerate(tqdm(data.items())):
         if isinstance(value, (list, np.ndarray)) and len(np.array(value).shape) == 3:
             plt.figure()
-            plt.imshow(value[4, :, :], cmap='hot', interpolation='nearest')
+            plt.imshow(value[3, :, :], cmap='hot', interpolation='nearest')
             plt.title(f"Grid Cell for Coordinate {key}")
             plt.colorbar()
             file_name = os.path.join(directory, f'grid_cell_{i}.png')
@@ -32,4 +32,4 @@ def visualize_and_save_grid_cells(data, directory):
         else:
             print(f"The value for key {key} is not a 2D array.")
 
-visualize_and_save_grid_cells(data, './img/grid_visulization')
+visualize_and_save_grid_cells(coords_data, './img/grid_visulization')
