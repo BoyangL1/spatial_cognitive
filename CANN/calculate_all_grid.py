@@ -13,16 +13,12 @@ class GridModel:
     def __init__(self):
         print("Initialize grid model")
         self.n = 2**7  # number of neurons
-        self.h_grid = 8  # layers of grid cells
         self.dt = 0.5
         self.tau = 5  # neuron time constant
 
         # Envelope and Weight Matrix Parameters
         self.wmag = 2.4
         self.wtphase = 2
-        self.lmin = 8
-        self.lmax = 32
-        self.lexp = -1
         self.alpha = 1
 
         # Envelope and Weight Matrix parameters
@@ -34,7 +30,8 @@ class GridModel:
             self.a_envelope = 0.6 * np.ones((self.n, self.n))
 
         # initialize weight matrix, input envelope and r mask
-        self.l_inhibition = UP.setInhibLength(self.h_grid, self.lexp, self.lmin, self.lmax)
+        self.l_inhibition = [8,10,12,14,16]
+        self.h_grid = len(self.l_inhibition) # layers of grid cells
         self.w, self.w_u, self.w_d, self.w_l, self.w_r, self.r_l_mask, self.r_r_mask, self.r_u_mask, self.r_d_mask = UP.initializeWeight(self.n, self.h_grid, self.l_inhibition, self.wmag, self.wtphase)
 
         # initialize grid pattern
