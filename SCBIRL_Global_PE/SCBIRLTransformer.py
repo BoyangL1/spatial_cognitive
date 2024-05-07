@@ -214,11 +214,12 @@ class avril:
         # calculate the kl difference between current reward and pre reward 
         means, log_sds, enc_output = getRewardParameters(e_params, 0)
         if self.load_params:
+            # 有先验迭代
             e_params_pre, _, _ = self.pre_params
             means_pre, log_sds_pre , _ = getRewardParameters(e_params_pre, 0)
-            
             kl = kl_divergence(means, np.exp(log_sds), means_pre, np.exp(log_sds_pre)).mean()
         else:
+            # 无先验迭代，标准正态分布
             kl = klGaussianStandard(means, np.exp(log_sds) ** 2).mean()
 
         # calculate td error

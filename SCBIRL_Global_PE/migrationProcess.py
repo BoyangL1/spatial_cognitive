@@ -53,7 +53,7 @@ def computeRewardOrValue(model, input_path, output_path, attribute_type='value')
         reward_df.to_csv(output_path, index=False)
     return
 
-def computeTransitionProb(model, input_path):
+def computeTransitionProb(model, input_path, output_path):
     """
     Compute transition probabilities for each state using a given model and save to a CSV file.
 
@@ -74,7 +74,7 @@ def computeTransitionProb(model, input_path):
     with open("./data/coords_fnid_mapping.pkl", "rb") as f:
         coords_fnid = pickle.load(f)
 
-    # sort the dictionary by value
+    # ref sort the dictionary by value
     coords_id = dict(sorted(coords_id.items()))
     transitionProbs = []
     coordsIdx = []
@@ -89,13 +89,15 @@ def computeTransitionProb(model, input_path):
             # add three dimension
             pe_code = np.expand_dims(np.expand_dims(np.expand_dims(pe_code, axis=0), axis=0), axis = 0)
             state = np.expand_dims(np.expand_dims(np.expand_dims(state, axis=0), axis=0), axis = 0)
-
             # get transition probability
             transProbVec = computeFunc(state,pe_code)
         transitionProbs.append(transProbVec)
         coordsIdx.append(coords)
     
-    return np.array(transitionProbs), coordsIdx
+    res = (np.array(transitionProbs), coordsIdx)
+    with open(output_path, 'wb') as f:
+        pickle.dump(res, f)
+    return     
 
 def getComputeFunction(model, attribute_type):
     """Return the appropriate function to compute either 'value' or 'reward'."""
@@ -295,7 +297,7 @@ def afterMigrt(afterMigrtFile, beforeMigrtFile, full_trajectory_path, inputPath,
         # Append the key-value pair as a new row to resultsDf
         resultsDf = resultsDf._append({'coords': key, 'fnid': value}, ignore_index=True)
 
-    modelDir = "./data_pe/after_migrt/model"
+    modelDir = "./data_pe/after_migrt/no_prior_model"
     if not os.path.exists(modelDir):
         os.makedirs(modelDir)
     preDate = 0 # load preDate model parameters
@@ -307,7 +309,7 @@ def afterMigrt(afterMigrtFile, beforeMigrtFile, full_trajectory_path, inputPath,
             model.loadParams(modelPath)
 
         if i < memory_buffer:
-            before_chain = before_migrt_chains[-(memory_buffer-i):]
+            before_chain = before_migrt_chains[-(memory_buffer-i):] + trajChains[:i]
         else:
             before_chain = trajChains[i-memory_buffer:i]
         train_chain = before_chain + [trajChains[i]]
