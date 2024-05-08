@@ -190,7 +190,7 @@ def processBeforeMigrationData(state_attribute, visitedState, computeFunc, id_co
     dfResults = pd.DataFrame(beforeMigrtTrans, columns=columns)
     dfResults.to_csv(f"./data_pe/before_migrt_transProb.csv", index=False)
 
-def processAfterMigrationData(tc, stateAttribute, model, visitedState, id_coords, coords_fnid, actionDim):
+def processAfterMigrationData(tc, stateAttribute, model, visitedState, id_coords, coords_fnid, actionDim, outputPath="./data_pe/"):
     """
     Process data after migration, including calculating rewards and transition probabilities.
 
@@ -260,21 +260,23 @@ def processAfterMigrationData(tc, stateAttribute, model, visitedState, id_coords
     columns = ['coords'] + [id_coords[i] for i in range(actionDim-1)] + ['no action']
     dfResults = pd.DataFrame(results, columns=columns)
 
-    output_dir = f"./data_pe/after_migrt/transProb/"
+    output_dir = outputPath + f"after_migrt/transProb/"
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
-    dfResults.to_csv(f"./data_pe/after_migrt/transProb/{tc[-1].date}.csv", index=False)
+    dfResults.to_csv(outputPath + f"after_migrt/transProb/{tc[-1].date}.csv", index=False)
 
     return rewardValues
 
-def afterMigrt(afterMigrtFile, beforeMigrtFile, full_trajectory_path, inputPath, outputPath, model):
+def afterMigrt(model, afterMigrtFile, beforeMigrtFile, full_trajectory_path, model_load_path='./model/params_transformer_pe.pickle', 
+               inputPath = './data/', outputPath = './data_pe/'):
     # Load model parameters from a saved state.
-    model.loadParams('./model/params_transformer_pe.pickle')
-
+    model.loadParams(model_load_path)
+    # Get the model save directory
+    modelSaveDir = os.path.dirname(model_load_path) + '/'
     # Load the mapping between IDs and their corresponding fnid.
-    with open("./data/id_coords_mapping.pkl", "rb") as f:
+    with open(inputPath + "id_coords_mapping.pkl", "rb") as f:
         id_coords = pickle.load(f)
-    with open("./data/coords_fnid_mapping.pkl", "rb") as f:
+    with open(inputPath + "coords_fnid_mapping.pkl", "rb") as f:
         coords_fnid = pickle.load(f)
 
     # Define a function to compute Q-values given a state and corresponding grid_code.
@@ -285,7 +287,7 @@ def afterMigrt(afterMigrtFile, beforeMigrtFile, full_trajectory_path, inputPath,
     actionDim = getActionDim(all_chains)
 
     # Read and preprocess data for analysis.
-    visitedState, trajChains, stateAttribute = readAndPrepareData(afterMigrtFile, beforeMigrtFile, inputPath)
+    visitedState, trajChains, stateAttribute = readAndPrepareData(afterMigrtFile, beforeMigrtFile, inputPath + 'all_traj_feature.csv')
 
     # Process and update state attributes before migration.
     processBeforeMigrationData(stateAttribute, visitedState, computeFunc, id_coords, coords_fnid, actionDim)
@@ -297,7 +299,8 @@ def afterMigrt(afterMigrtFile, beforeMigrtFile, full_trajectory_path, inputPath,
         # Append the key-value pair as a new row to resultsDf
         resultsDf = resultsDf._append({'coords': key, 'fnid': value}, ignore_index=True)
 
-    modelDir = "./data_pe/after_migrt/no_prior_model"
+
+    modelDir = modelSaveDir + "evolution_model/"
     if not os.path.exists(modelDir):
         os.makedirs(modelDir)
     preDate = 0 # load preDate model parameters
@@ -315,13 +318,13 @@ def afterMigrt(afterMigrtFile, beforeMigrtFile, full_trajectory_path, inputPath,
         train_chain = before_chain + [trajChains[i]]
 
         # Process and calculate reward values after migration.
-        rewardValues = processAfterMigrationData(train_chain, stateAttribute, model, visitedState, id_coords, coords_fnid, actionDim)
+        rewardValues = processAfterMigrationData(train_chain, stateAttribute, model, visitedState, id_coords, coords_fnid, actionDim, outputPath)
 
         # Train the model.
         model.train(iters=1000,loss_threshold=0.01)
 
         # Save the current model state.
-        modelSavePath = "./data_pe/after_migrt/model/" + str(train_chain[-1].date) + ".pickle"
+        modelSavePath = modelSaveDir + "evolution_model/" + str(train_chain[-1].date) + ".pickle"
         model.modelSave(modelSavePath)
 
         # Store the calculated reward values in the results DataFrame.
@@ -330,4 +333,4 @@ def afterMigrt(afterMigrtFile, beforeMigrtFile, full_trajectory_path, inputPath,
         preDate = train_chain[-1].date
 
     # Save results.
-    resultsDf.to_csv(outputPath, index=False)
+    resultsDf.to_csv(outputPath + 'after_migrt_reward.csv', index=False)

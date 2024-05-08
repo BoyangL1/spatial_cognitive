@@ -4,6 +4,7 @@ import pandas as pd
 from scipy.linalg import qr
 import json
 import pickle
+import os
 
 from collections import namedtuple
 from sklearn.preprocessing import MinMaxScaler
@@ -29,7 +30,7 @@ def getActionDim(all_chains):
     # 去所有出行链中id 最大的一个编号, 加1为长度, 再加1为no action
     return max({id for tc in all_chains for id in tc.id_chain}) + 2 # id_chain is a sequence, so the length = max +1 +1
 
-def preprocessStateAttributes(traj_file, all_feature_path='./data/all_traj_feature.csv'):
+def preprocessStateAttributes(traj_file, all_feature_path=None):
     """
     Preprocess state attributes from a trajectory file.
 
@@ -43,10 +44,12 @@ def preprocessStateAttributes(traj_file, all_feature_path='./data/all_traj_featu
     Returns:
         tuple: A tuple containing the preprocessed DataFrame and the dimension of state attributes (excluding 'fnid').
     """
+    if all_feature_path is None:
+        all_feature_path = os.path.dirname(traj_file) + '/all_traj_feature.csv'
     state_attribute = pd.read_csv(all_feature_path)
 
     # Adjust columns based on the trajectory file
-    if traj_file == './data/before_migrt.json':
+    if traj_file.endswith('before_migrt.json'):
         state_attribute.drop(columns=['post_home_distance'], inplace=True)
         state_attribute.rename(columns={'pre_home_distance': 'home_distance'}, inplace=True)
     else:

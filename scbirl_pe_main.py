@@ -18,13 +18,12 @@ if __name__ =="__main__":
     feature_file_all = data_dir + 'all_traj_feature.csv'
     output_reward_path = save_dir + 'after_migrt_reward.csv'
 
-
     inputs, targets_action, pe_code, action_dim, state_dim = SIRLU.loadTrajChain(before_migration_path, full_trajectory_path)
     print(inputs.shape,targets_action.shape,pe_code.shape)
     model = SIRLT.avril(inputs, targets_action, pe_code, state_dim, action_dim, state_only=True)
 
     # model the model with no prior knowledge
-    # PriorKnow.experienceModel(after_migration_path, before_migration_path, full_trajectory_path, feature_file_all, save_dir, model)
+    PriorKnow.experienceModel(after_migration_path, before_migration_path, full_trajectory_path, feature_file_all, save_dir, model)
 
     # NOTE: train the model before migration
     model.train(iters=1000,loss_threshold=0.001)

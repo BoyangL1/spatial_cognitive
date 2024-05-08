@@ -10,12 +10,12 @@ sys.path.append(working_directory)
 
 from SCBIRL_Global_PE.migrationProcess import *
 
-def experienceModel(afterMigrtFile, beforeMigrtFile, full_trajectory_path, inputPath, outputPath, model_no_prior):
+def experienceModel(model_no_prior, afterMigrtFile, beforeMigrtFile, full_trajectory_path, dataPath = './data/', outputPath = './data_pe/'):
 
     # Load the mapping between IDs and their corresponding fnid.
-    with open("./data/id_coords_mapping.pkl", "rb") as f:
+    with open(dataPath + "id_coords_mapping.pkl", "rb") as f:
         id_coords = pickle.load(f)
-    with open("./data/coords_fnid_mapping.pkl", "rb") as f:
+    with open(dataPath + "coords_fnid_mapping.pkl", "rb") as f:
         coords_fnid = pickle.load(f)
 
     all_chains = loadTravelDataFromDicts(loadJsonFile(full_trajectory_path))
@@ -23,7 +23,7 @@ def experienceModel(afterMigrtFile, beforeMigrtFile, full_trajectory_path, input
     actionDim = getActionDim(all_chains)
 
     # Read and preprocess data for analysis.
-    visitedState, trajChains, stateAttribute = readAndPrepareData(afterMigrtFile, beforeMigrtFile, inputPath)
+    visitedState, trajChains, stateAttribute = readAndPrepareData(afterMigrtFile, beforeMigrtFile, dataPath + 'all_traj_feature.csv')
 
     # Initialize an empty DataFrame with predefined columns
     resultsDf = pd.DataFrame(columns=['coords', 'fnid'])
@@ -32,7 +32,7 @@ def experienceModel(afterMigrtFile, beforeMigrtFile, full_trajectory_path, input
         # Append the key-value pair as a new row to resultsDf
         resultsDf = resultsDf._append({'coords': key, 'fnid': value}, ignore_index=True)
 
-    modelDir = "./data_pe/after_migrt/no_prior_model"
+    modelDir = outputPath + "no_prior_model"
     if not os.path.exists(modelDir):
         os.makedirs(modelDir)
     memory_buffer = 10 # days
@@ -46,7 +46,7 @@ def experienceModel(afterMigrtFile, beforeMigrtFile, full_trajectory_path, input
         train_chain = before_chain + [trajChains[i]]
 
         # Process and calculate reward values after migration.
-        rewardValues = processAfterMigrationData(train_chain, stateAttribute, model, visitedState, id_coords, coords_fnid, actionDim)
+        rewardValues = processAfterMigrationData(train_chain, stateAttribute, model, visitedState, id_coords, coords_fnid, actionDim, outputPath)
 
         # Train the model.
         model.train(iters=1000,loss_threshold=0.01)
