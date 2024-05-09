@@ -16,6 +16,7 @@ import numpy as np
 
 # 方法二
 working_directory = os.getcwd()
+# 等价于
 working_directory = os.path.abspath('.')
 sys.path.append(working_directory)
 

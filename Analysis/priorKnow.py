@@ -46,8 +46,8 @@ def experienceModel(model_no_prior, afterMigrtFile, beforeMigrtFile, full_trajec
         train_chain = before_chain + [trajChains[i]]
 
         # Process and calculate reward values after migration.
-        rewardValues = processAfterMigrationData(train_chain, stateAttribute, model, visitedState, id_coords, coords_fnid, actionDim, outputPath)
-
+        # rewardValues = processAfterMigrationData(train_chain, stateAttribute, model, visitedState, id_coords, coords_fnid, actionDim, outputPath)
+        plugInDataPair(train_chain, stateAttribute, model, visitedState)
         # Train the model.
         model.train(iters=1000,loss_threshold=0.01)
 

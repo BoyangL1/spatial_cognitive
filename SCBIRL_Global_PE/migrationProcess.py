@@ -190,6 +190,17 @@ def processBeforeMigrationData(state_attribute, visitedState, computeFunc, id_co
     dfResults = pd.DataFrame(beforeMigrtTrans, columns=columns)
     dfResults.to_csv(f"./data_pe/before_migrt_transProb.csv", index=False)
 
+def plugInDataPair(tc, stateAttribute, model, visitedState):
+    # Preprocess trajectory data and update visited states
+    stateNextState, actionNextAction, peNextpe = processTrajectoryData(tc, stateAttribute, model.s_dim)
+    for t in tc:
+        visitedState.update(tuple(item) if isinstance(item, list) else item for item in t.travel_chain)
+
+    # Set model inputs for training or evaluation
+    model.inputs = stateNextState
+    model.targets = actionNextAction
+    model.pe_code = peNextpe
+
 def processAfterMigrationData(tc, stateAttribute, model, visitedState, id_coords, coords_fnid, actionDim, outputPath="./data_pe/"):
     """
     Process data after migration, including calculating rewards and transition probabilities.
@@ -206,15 +217,7 @@ def processAfterMigrationData(tc, stateAttribute, model, visitedState, id_coords
     Returns:
         list: List of reward values for each state.
     """
-    # Preprocess trajectory data and update visited states
-    stateNextState, actionNextAction, peNextpe = processTrajectoryData(tc, stateAttribute, model.s_dim)
-    for t in tc:
-        visitedState.update(tuple(item) if isinstance(item, list) else item for item in t.travel_chain)
-
-    # Set model inputs for training or evaluation
-    model.inputs = stateNextState
-    model.targets = actionNextAction
-    model.pe_code = peNextpe
+    plugInDataPair(tc, stateAttribute, model, visitedState)
 
     # Define functions for reward calculation and Q-value computation
     rewardFunction = getComputeFunction(model, 'reward')

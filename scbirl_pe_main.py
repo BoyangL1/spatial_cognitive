@@ -23,10 +23,10 @@ if __name__ =="__main__":
     model = SIRLT.avril(inputs, targets_action, pe_code, state_dim, action_dim, state_only=True)
 
     # model the model with no prior knowledge
-    PriorKnow.experienceModel(after_migration_path, before_migration_path, full_trajectory_path, feature_file_all, save_dir, model)
+    PriorKnow.experienceModel(model, after_migration_path, before_migration_path, full_trajectory_path, data_dir, save_dir)
 
     # NOTE: train the model before migration
-    model.train(iters=1000,loss_threshold=0.001)
+    # model.train(iters=1000,loss_threshold=0.001)
     # model_save_path = model_dir + 'params_transformer_pe.pickle'
     # model.modelSave(model_save_path)
 
@@ -40,4 +40,4 @@ if __name__ =="__main__":
     SIRLP.computeTransitionProb(model, feature_file, save_dir + 'before_migrt_transition_prob.pkl')
     
     # NOTE: Compute rewards after migration
-    SIRLP.afterMigrt(after_migration_path, before_migration_path, full_trajectory_path, feature_file_all, output_reward_path, model)
+    SIRLP.afterMigrt(model, after_migration_path, before_migration_path, full_trajectory_path)
