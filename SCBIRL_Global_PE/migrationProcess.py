@@ -273,6 +273,8 @@ def processAfterMigrationData(tc, stateAttribute, model, visitedState, id_coords
 
     return rewardValues
 
+
+
 def afterMigrt(model, afterMigrtFile, beforeMigrtFile, full_trajectory_path, model_load_path='./model/params_transformer_pe.pickle', 
                inputPath = './data/', outputPath = './data_pe/'):
     # Load model parameters from a saved state.

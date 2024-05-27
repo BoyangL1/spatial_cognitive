@@ -31,4 +31,4 @@ def train_model_one_traveler(who: int):
     SIRLP.afterMigrt(model, after_migration_path, before_migration_path, full_trajectory_path, model_save_path, data_dir, save_dir)
 
 if __name__ =="__main__":
-    train_model_one_traveler(who = 6854307)
+    train_model_one_traveler(who = 37852495)
