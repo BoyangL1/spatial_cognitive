@@ -18,6 +18,7 @@ if __name__ =="__main__":
     feature_file_all = data_dir + 'all_traj_feature.csv'
     output_reward_path = save_dir + 'after_migrt_reward.csv'
 
+    # todo: 这里用的是搬家前的最长长度，如果搬家后的长度更长，有可能程序会崩？
     inputs, targets_action, pe_code, action_dim, state_dim = SIRLU.loadTrajChain(before_migration_path, full_trajectory_path)
     print(inputs.shape,targets_action.shape,pe_code.shape)
     model = SIRLT.avril(inputs, targets_action, pe_code, state_dim, action_dim, state_only=True)

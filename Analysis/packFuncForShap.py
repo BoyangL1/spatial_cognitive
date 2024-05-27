@@ -13,7 +13,7 @@ import SCBIRL_Global_PE.migrationProcess as SIRLM
 from SCBIRL_Global_PE.utils import TravelData
 
 
-def loadModel(path = None):
+def loadModel(path = None, tabular = False):
     '''
         Load the model from the model directory.
         Must correctly set the directory at first.
@@ -30,6 +30,8 @@ def loadModel(path = None):
     inputs, targets_action, pe_code, action_dim, state_dim = SIRLU.loadTrajChain(before_migration_path, full_trajectory_path)
     print(inputs.shape,targets_action.shape,pe_code.shape)
     model = SIRLT.avril(inputs, targets_action, pe_code, state_dim, action_dim, state_only=True)
+    if tabular: 
+        return model
 
     if path is None:
         path = model_dir + 'params_transformer_pe.pickle'
@@ -121,8 +123,6 @@ def migrationDate():
 
 if __name__ == '__main__':
     import shap
-
-
     model = loadModel()
     migrationDate()
     

@@ -109,7 +109,8 @@ def padSequences(data_list, element_shape, padding_value=-999):
 
 def processTrajectoryData(traj_chains, state_attribute, s_dim):
     """
-    Process trajectory data to generate sequences of states, actions, and grids.This function iterates through trajectory chains and processes each trajectory to generate sequences of
+    Process trajectory data to generate sequences of states, actions, and grids.
+    This function iterates through trajectory chains and processes each trajectory to generate sequences of
     state-next_state, action-next_action, and grid-next_grid pairs.
 
     Args:

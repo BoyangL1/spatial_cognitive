@@ -26,19 +26,19 @@ def computeRewardOrValue(model, input_path, output_path, attribute_type='value')
     """
     
     # Using preprocessing function from utils
-    state_attribute, _ = preprocessStateAttributes('./data/before_migrt.json',input_path)
+    state_attribute, _ = preprocessStateAttributes('./data/before_migrt.json', input_path)
 
     computeFunc = getComputeFunction(model, attribute_type)
 
     with open("./data/coords_fnid_mapping.pkl", "rb") as f:
         coords_fnid = pickle.load(f)
-    
+
     rewardValues = []
     for coords, fnid in tqdm(coords_fnid.items(), total=len(coords_fnid),desc="compute "+ attribute_type):
         if fnid not in state_attribute.fnid.values:
             continue
         # get state attribute of this fnid
-        state = getStateRow(state_attribute,fnid)
+        state = getStateRow(state_attribute, fnid)
         pe_code = globalPE(coords,len(state)).flatten()
         # add three dimension
         pe_code = np.expand_dims(np.expand_dims(np.expand_dims(pe_code, axis=0), axis=0), axis = 0)
@@ -192,7 +192,9 @@ def processBeforeMigrationData(state_attribute, visitedState, computeFunc, id_co
 
 def plugInDataPair(tc, stateAttribute, model, visitedState):
     # Preprocess trajectory data and update visited states
+    # 每次迭代，高维度数组的轨迹长度都是不一样的，都是本批次（10天内）最长的长度。
     stateNextState, actionNextAction, peNextpe = processTrajectoryData(tc, stateAttribute, model.s_dim)
+    # 这里会更新去过的state
     for t in tc:
         visitedState.update(tuple(item) if isinstance(item, list) else item for item in t.travel_chain)
 
@@ -217,6 +219,7 @@ def processAfterMigrationData(tc, stateAttribute, model, visitedState, id_coords
     Returns:
         list: List of reward values for each state.
     """
+    # 模型在此输入每一天的数据
     plugInDataPair(tc, stateAttribute, model, visitedState)
 
     # Define functions for reward calculation and Q-value computation
