@@ -11,6 +11,7 @@ from sklearn.preprocessing import MinMaxScaler
 
 TravelData = namedtuple('TravelChain', ['date', 'travel_chain','id_chain','fnid_chain'])
 
+
 def loadJsonFile(file_path):
     with open(file_path, 'r') as file:
         return json.load(file)
@@ -237,6 +238,47 @@ def loadTrajChain(traj_file, full_traj_path, num_trajs=None):
     # 第三个输出grid_next_grid是四维数组, dim(num_traj, max_traj_len, 2, nlevel)
     return state_next_state, action_next_action, grid_next_grid, a_dim, s_dim
     
+# below is function added by Cover Wu.    
+def toWhoString(who: int):
+    return '{:08d}'.format(who)
+
+def migrationDate(who: int = 36384703):
+    # using the os path to get the after traj path
+    data_dir = './data/user_data/' + toWhoString(who) + '/'
+    after_traj_path = data_dir + 'after_migrt.json'
+
+    after_traj = loadJsonFile(after_traj_path)
+    migration_date = after_traj[0]['date']
+    return migration_date
+
+def load_traveler(who: int):
+    with open(f'./data/user_data/{toWhoString(who)}/traveler_info.pkl', 'rb') as file:
+        return pickle.load(file)
+
+def load_id_coords_mapping(who: int):
+    data_dir = f'./data/user_data/'
+    id_coord_mapping_path = data_dir + toWhoString(who) + '/id_coords_mapping.pkl'
+    with open(id_coord_mapping_path, "rb") as f:
+        coords_id = pickle.load(f)
+    return coords_id
+
+def load_all_traj(who: int):
+    data_dir = f'./data/user_data/'
+    all_traj_path = data_dir + toWhoString(who) + '/all_traj.json'
+    with open(all_traj_path, 'r') as file:
+        loaded_dicts_all = json.load(file)
+    loaded_namedtuples_all = [TravelData(**d) for d in loaded_dicts_all]
+    return loaded_namedtuples_all
+
+def load_state_attrs(who: int, before=True):
+    data_dir = f'./data/user_data/'
+    filename = 'before_migrt.json' if before else 'after_migrt.json'
+    
+    traj_path = data_dir + toWhoString(who) + '/' + filename
+    state_attribute, _ = preprocessStateAttributes(traj_path)
+    return state_attribute
+
+
 if __name__ == "__main__":
     path = f'./data/before_migrt.json'
     full_traj_path = f'./data/all_traj.json'

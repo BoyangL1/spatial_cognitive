@@ -105,7 +105,7 @@ def compute_wasserstein(pe_compressed_reduced, transitionProbs, i, j, method='po
             pass
         return entry
 
-def clusterThres(spatial_distrib_params, social_distrib_params, alpha = 2):
+def clusterThres(spatial_distrib_params, social_distrib_params, alpha = 1.5):
     s_1, _, scale_1 = spatial_distrib_params
     s_2, _, scale_2 = social_distrib_params
     sigma_agg = np.sqrt(s_1 ** 2 + s_2 ** 2)

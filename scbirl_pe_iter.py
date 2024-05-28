@@ -23,7 +23,7 @@ def train_model_one_traveler(who: int):
     PriorKnow.experienceModel(model, after_migration_path, before_migration_path, full_trajectory_path, data_dir, model_dir)
 
     # NOTE: train the model before migration
-    model.train(iters=1000,loss_threshold=0.001)
+    model.train(iters=1000, loss_threshold=0.001)
     model_save_path = model_dir + 'before_migrt_model.pickle'
     model.modelSave(model_save_path)
 
