@@ -36,18 +36,44 @@ def add_fnid(df):
     df['grid_id_d'] = result_d['fnid']
     return df
 
+def join_fnid(df, grid_gdf):
+    # 在这里加一个ss_city_grid就成了，不用空间计算。
+    df['geometry_o'] = [Point(xy) for xy in zip(df['lambda_o'], df['phi_o'])]
+    df['geometry_d'] = [Point(xy) for xy in zip(df['lambda_d'], df['phi_d'])]
+    df = pd.merge(df, grid_gdf, how='left', left_on=['org_chess_x', 'org_chess_y'], right_on=['CHESS_X', 'CHESS_Y'])
+    df.rename(columns={'FNID': 'grid_id_o'}, inplace=True)    
+    df = pd.merge(df, grid_gdf, how='left', left_on=['dst_chess_x', 'dst_chess_y'], right_on=['CHESS_X', 'CHESS_Y'])
+    df.rename(columns={'FNID': 'grid_id_d'}, inplace=True)
+    df.drop(columns=['CHESS_X_x', 'CHESS_Y_x', 'geometry_x', 'CHESS_X_y', 'CHESS_Y_y', 'geometry_y'], inplace=True)
+    return df
+
+
 def skip_empty_row(df):
 # Finding rows with at least one NaN value, out of city
     columns_to_check = ["lambda_o","phi_o","lambda_d","phi_d","grid_id_o","grid_id_d"]
     rows_with_nan = df[columns_to_check].isna().any(axis=1)
     nan_indexes = df[rows_with_nan].index
-    nan_indexes
+    
+    nan_indexes_stack = nan_indexes.tolist()
+    # for i in nan_indexes[::2]:
+    #     df.at[i, 'etime'] = df.at[i + 1, 'etime']
+    #     df.loc[i] = df.loc[i].combine_first(df.loc[i + 1])
+    # df.drop(nan_indexes[1::2], inplace=True)
 
-    for i in nan_indexes[::2]:
-        # df.at[i, 'etime'] = df.at[i + 1, 'etime']
-        df.loc[i] = df.loc[i].combine_first(df.loc[i + 1])
-    df.drop(nan_indexes[1::2], inplace=True)
-
+    while nan_indexes_stack:
+        i = nan_indexes_stack.pop(0)
+        j = nan_indexes_stack[0]
+        k = -3 # any negative integer number expect -1 and 0
+        if i + 1 == j:
+            df.loc[i] = df.loc[i].combine_first(df.loc[j])
+            k = nan_indexes_stack.pop(0)
+            df.drop(index=j, inplace=True)
+        elif k + 1 == i:
+            df.loc[k] = df.loc[k].combine_first(df.loc[i])
+            df.drop(index=i, inplace=True)
+        else:
+            df.drop(index=i, inplace=True)
+            
     df.fillna(0, inplace=True)
     df.reset_index(drop=True, inplace=True)
     return df
@@ -238,7 +264,7 @@ def split_feature_data(df, trg_path):
     before_feature.to_csv(trg_path + '/before_migrt_feature.csv',index=False)
 
     after_feature = mergeFeatureDataframes(df_after_migrt)
-    after_feature.to_csv(trg_path + './after_migrt_feature.csv',index=False)
+    after_feature.to_csv(trg_path + '/after_migrt_feature.csv',index=False)
 
     all_feature = mergeFeatureDataframes(df)
     all_feature.to_csv(trg_path + '/all_traj_feature.csv',index=False)
@@ -251,6 +277,9 @@ if __name__ == '__main__':
     who_list = list(map(extract_who, filenames))
 
     user_chain_trg_path = './data/user_data/'
+        
+    grid_gdf = gpd.read_file("./data/shenzhen_grid/grid/ss_city_grid_by_cover/ss_city_grid_by_cover.shp")
+
     # create new directories:
     trg_paths = []
     for who in who_list:
@@ -261,7 +290,8 @@ if __name__ == '__main__':
 
     for i, filename in enumerate(filenames):
         df = pd.read_csv(user_chain_src_path + filename)
-        df = add_fnid(df)
+        # df = add_fnid(df)
+        df = join_fnid(df, grid_gdf)
         df = skip_empty_row(df)
         df = remove_discontinuous(df)
         df = drop_unnecessary_columns(df)

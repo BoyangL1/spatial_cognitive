@@ -31,4 +31,31 @@ def train_model_one_traveler(who: int):
     SIRLP.afterMigrt(model, after_migration_path, before_migration_path, full_trajectory_path, model_save_path, data_dir, save_dir)
 
 if __name__ =="__main__":
-    train_model_one_traveler(who = 37852495)
+    '''
+        Iteration Version
+    '''
+    # for who in who_list:
+    #     train_model_one_traveler(who = who)
+
+    '''
+        Parallel Version
+    '''
+    # import multiprocessing as mp
+    
+    # MAX_CPU_COUNT = 6
+    # done_who = [6854307, 21410711, 33816672, 37852495]
+    # import os
+    # file_list = os.listdir('./data/user_chains/')
+    # pid_list = [s.rstrip('.csv').split('_')[-1] for s in file_list]
+    # who_list = [int(pid) for pid in pid_list]
+    # for who in done_who:
+    #     who_list.remove(who)
+
+    # with mp.Pool(MAX_CPU_COUNT) as pool:
+    #     pool.map(train_model_one_traveler, who_list)
+
+
+    '''
+        Terminal Version
+    '''
+    train_model_one_traveler(who = 39317715)

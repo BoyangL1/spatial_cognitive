@@ -18,6 +18,10 @@ from functools import partial
 import pickle
 import multiprocessing as mp
 
+# if gpu is not useful, force to use cpu
+import jax
+jax.config.update('jax_platform_name', 'cpu')
+
 # count the cpu number
 MAX_CPU_COUNT = mp.cpu_count() - 1
  
@@ -185,6 +189,31 @@ def modelUserDateCombination():
             combination.append((int(user), date))
     return combination
 
+def modelDateOfUser(user):
+    model_dir = './model/'
+    user = f'{user:08d}'
+    evolution_model_path = model_dir + user + '/' + 'evolution_model/'
+    date_list = [int(params.rstrip('.pickle')) for params in os.listdir(evolution_model_path)]
+    date_list = date_list[::7]
+    return date_list
+
+
+def explainOneUser(user, parallel=False):
+    date_list = modelDateOfUser(user)
+    
+    if not parallel:
+        shap_dict = dict()
+        for date in date_list:
+            shap_dict[date] = modelRewardExplain(date, who=user)
+    else:
+        # parallel version
+        CPU_COUNT = len(date_list)
+        combination = [(date, user) for date in date_list]
+        with mp.Pool(CPU_COUNT) as pool:
+            shap_dict_values = pool.starmap(modelRewardExplain, combination)
+        shap_dict = dict(zip(date_list, shap_dict_values))
+    return shap_dict
+
 
 def explainAllRewards(parallel = False):
     combination = modelUserDateCombination()
@@ -195,12 +224,39 @@ def explainAllRewards(parallel = False):
             shap_dict[(user, date)] = modelRewardExplain(date, who=user)
     else:
         # parallel version
-        funcWrapper = lambda tuple_args : modelRewardExplain(tuple_args[1], who=tuple_args[0])
+        combination_switch = [(date, user) for user, date in combination]
         with mp.Pool(MAX_CPU_COUNT) as pool:
-            shap_dict_values = pool.map(funcWrapper, combination)
+            shap_dict_values = pool.starmap(modelRewardExplain, combination_switch)
         for idx, (user, date) in enumerate(combination):
             shap_dict[(user, date)] = shap_dict_values[idx]
     return shap_dict
 
 if __name__ == '__main__':
-    explainAllRewards()
+    '''
+    Full Parallel Version
+    '''
+    res = explainAllRewards(parallel=True)
+    with open('./product/shap_res.pkl', 'wb') as f:
+        pickle.dump(res, f)
+    
+    '''
+    Half Parallel Version
+    '''
+    # model_dir = './model/'
+    # user_list = [int(name) for name in os.listdir(model_dir) if name.isdigit()]
+    # user_list.sort()
+    # for user in user_list:
+    #     res = explainOneUser(user, parallel=False)
+    #     with open('./product/shap_res_{:08d}.pkl'.format(user), 'wb') as f:
+    #         pickle.dump(res, f)
+    '''
+    By Hand
+    '''
+    # model_dir = './model/'
+    # user_list = [int(name) for name in os.listdir(model_dir) if name.isdigit()]
+    # user_list.sort()
+
+    # user = user_list[9]
+    # res = explainOneUser(user, parallel=False)
+    # with open('./product/shap_res_{:08d}.pkl'.format(user), 'wb') as f:
+    #     pickle.dump(res, f)
