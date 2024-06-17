@@ -23,7 +23,9 @@ import jax
 jax.config.update('jax_platform_name', 'cpu')
 
 # count the cpu number
-MAX_CPU_COUNT = mp.cpu_count() - 1
+# MAX_CPU_COUNT = mp.cpu_count() - 1
+MAX_CPU_COUNT = 48
+
  
 def loadModel(who = 36384703, date = None, prior = True, tabular = False):
     '''
@@ -231,13 +233,29 @@ def explainAllRewards(parallel = False):
             shap_dict[(user, date)] = shap_dict_values[idx]
     return shap_dict
 
+def modelRewardCalculation(date: int, who: int = 36384703):
+    '''
+        Give the SHAP value by grouping the type.
+    '''
+    
+    print('Explaining person: {who:8d}, date: {date}'.format(who=who, date=date))
+    model = loadModel(who=who, date=date)
+    modelPredWrapper = partial(modelPredict, model=model, attribute_type='reward')
+
+    dataset = backgroundData(who=who, date = date)
+    dataset_uni = np.unique(dataset, axis=0)
+    reward_comp = modelPredWrapper(dataset_uni)
+    res = np.mean(np.abs(reward_comp))
+    return res
+
+
 if __name__ == '__main__':
     '''
     Full Parallel Version
     '''
-    res = explainAllRewards(parallel=True)
-    with open('./product/shap_res.pkl', 'wb') as f:
-        pickle.dump(res, f)
+    # res = explainAllRewards(parallel=True)
+    # with open('./product/shap_res.pkl', 'wb') as f:
+    #     pickle.dump(res, f)
     
     '''
     Half Parallel Version
@@ -260,3 +278,18 @@ if __name__ == '__main__':
     # res = explainOneUser(user, parallel=False)
     # with open('./product/shap_res_{:08d}.pkl'.format(user), 'wb') as f:
     #     pickle.dump(res, f)
+    '''
+    Inspect the baseline.
+    '''
+    
+    model_dir = './model/'
+    user_list = [int(name) for name in os.listdir(model_dir) if name.isdigit()]
+    user_list.sort()
+    reward_dict = dict()
+    for user in user_list:
+        date_list = modelDateOfUser(user)
+        for date in date_list:
+            reward_dict[(user, date)] = modelRewardCalculation(date, who=user)
+            with open('./product/reward_res.pkl', 'wb') as f:
+                    pickle.dump(reward_dict, f)
+            

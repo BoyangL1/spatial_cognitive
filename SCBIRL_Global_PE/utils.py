@@ -238,7 +238,7 @@ def loadTrajChain(traj_file, full_traj_path, num_trajs=None):
     # 第三个输出grid_next_grid是四维数组, dim(num_traj, max_traj_len, 2, nlevel)
     return state_next_state, action_next_action, grid_next_grid, a_dim, s_dim
     
-# below is function added by Cover Wu.    
+# below is utility function added by Cover Wu.    
 def toWhoString(who: int):
     return '{:08d}'.format(who)
 
@@ -262,6 +262,13 @@ def load_id_coords_mapping(who: int):
         coords_id = pickle.load(f)
     return coords_id
 
+def load_fnid_coords_mapping(who: int):
+    data_dir = f'./data/user_data/'
+    id_coord_mapping_path = data_dir + toWhoString(who) + '/coords_fnid_mapping.pkl'
+    with open(id_coord_mapping_path, "rb") as f:
+        coords_fnid = pickle.load(f)
+    return coords_fnid
+
 def load_all_traj(who: int):
     data_dir = f'./data/user_data/'
     all_traj_path = data_dir + toWhoString(who) + '/all_traj.json'
@@ -278,6 +285,9 @@ def load_state_attrs(who: int, before=True):
     state_attribute, _ = preprocessStateAttributes(traj_path)
     return state_attribute
 
+def visited_date(who: int):
+    traveler = load_traveler(who)
+    return traveler.visit_date
 
 if __name__ == "__main__":
     path = f'./data/before_migrt.json'

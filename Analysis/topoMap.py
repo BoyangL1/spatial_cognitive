@@ -1,6 +1,7 @@
 # import module from the parent directory
 import sys
 import os
+from tqdm import tqdm
 import numpy as np
 # ref working direcotry、file path和environment path的关系：
 # ref 工作目录是当前项目运行，即vscode打开的目录
@@ -25,12 +26,15 @@ sys.path.append(working_directory)
 
 import pickle
 import SCBIRL_Global_PE.SCBIRLTransformer as SIRLT
+import SCBIRL_Global_PE.migrationProcess as SIRLP
 import SCBIRL_Global_PE.utils as SIRLU
+from TRAJ_PROCESS.prepareChain import Traveler
 
 from scipy.spatial import distance_matrix
 # note: scipy wasserstein function is too slow.
 from scipy.stats import wasserstein_distance_nd, lognorm
 import ot
+
 
 from sklearn.cluster import AgglomerativeClustering
 from itertools import combinations
@@ -42,7 +46,7 @@ def coords2compression(model, coords, depth: int):
     Transform the coordinates to the compressed representation by the model.
     '''
     # given the state return the location codes
-    gc_vectors = [SIRLU.globalPE(coord, state_dim) for coord in coords]
+    gc_vectors = [SIRLU.globalPE(coord, depth) for coord in coords]
     gc_vectors = np.squeeze(np.array(gc_vectors), axis=-1)
 
     # apply the model to the gc_vectors
@@ -98,6 +102,12 @@ def compute_wasserstein(pe_compressed_reduced, transitionProbs, i, j, method='po
         if method == 'scipy':
             entry = wasserstein_distance_nd(pe_compressed_reduced, pe_compressed_reduced, distribution_i, distribution_j)
         elif method == 'pot':
+            # below is necessary: because the pot library requires the input to be contiguous
+            if not distribution_i.flags.c_contiguous:
+                distribution_i = np.ascontiguousarray(distribution_i)
+            if not distribution_j.flags.c_contiguous:
+                distribution_j = np.ascontiguousarray(distribution_j)
+            # compute the optimal transport plan
             if M is None:
                 raise ValueError("The cost matrix M is not provided.")
             entry = ot.emd2(distribution_i, distribution_j, M)
@@ -113,42 +123,96 @@ def clusterThres(spatial_distrib_params, social_distrib_params, alpha = 1.5):
     thres_log = mu_agg - alpha * sigma_agg
     return np.exp(thres_log)
 
+def computeTransitionProb(model, who, date):
+    """
+    Compute transition probabilities for each state using a given model and save to a CSV file.
+    """
+    if date < SIRLU.migrationDate(who):
+        state_traj_src = f'./data/user_data/{who:08d}/before_migrt.json'
+    else:
+        state_traj_src = f'./data/user_data/{who:08d}/after_migrt.json'
+    
+    state_attribute, _ = SIRLU.preprocessStateAttributes(state_traj_src)
+    
+    all_traj_src = f'./data/user_data/{who:08d}/all_traj.json'
+    all_traj_dict = SIRLU.loadJsonFile(all_traj_src)
+    chains_dict = filter(lambda x: x['date'] <= date, all_traj_dict)
 
-if __name__ == '__main__':
-    data_dir = './data/'
-    model_dir = './model/'
-    save_dir = './data_pe/'
+    visited_id = list()
+    for d in chains_dict:
+        visited_id.extend(d['id_chain'])
+    visited_id = set(visited_id)
+    
+    computeFunc = SIRLP.getComputeFunction(model, 'transition_prob')
+    size = model.a_dim
+        
+    coords_id = SIRLU.load_id_coords_mapping(who)
+    coords_fnid = SIRLU.load_fnid_coords_mapping(who)
+
+    # ref sort the dictionary by value
+    coords_id = dict(sorted(coords_id.items()))
+    transitionProbs = []
+    coordsIdx = []
+    for id, coords in tqdm(coords_id.items(), total=len(coords_id),desc="compute transition probability"):
+        fnid = coords_fnid[coords]
+        if id not in visited_id:
+            transProbVec = np.full(size, np.nan)
+        else:
+        # get state attribute of this fnid
+            state = SIRLU.getStateRow(state_attribute, fnid)
+            pe_code = SIRLU.globalPE(coords,len(state)).flatten()
+            # add three dimension
+            pe_code = np.expand_dims(np.expand_dims(np.expand_dims(pe_code, axis=0), axis=0), axis = 0)
+            state = np.expand_dims(np.expand_dims(np.expand_dims(state, axis=0), axis=0), axis = 0)
+            # get transition probability
+            transProbVec = computeFunc(state,pe_code)
+        transitionProbs.append(transProbVec)
+        coordsIdx.append(coords)
+    
+    res = (np.array(transitionProbs), coordsIdx)
+    return res
+
+
+def clusterLocations(who, date):
+
+    data_dir = './data/' + f'user_data/{who:08d}/'
+    model_dir = './model/' + f'{who:08d}/'
+    save_dir = './product/' + f'{who:08d}/'
 
     # Paths for data files
     before_migration_path = data_dir + 'before_migrt.json'
     after_migration_path = data_dir + 'after_migrt.json'
     full_trajectory_path = data_dir + 'all_traj.json'
 
+    migrt_date = SIRLU.migrationDate(who)
+    if date >= migrt_date:
+        params_path = model_dir + f'evolution_model/{date:d}.pickle'
+    else:
+        params_path = model_dir + f'before_migrt_model.pickle'
+    
     inputs, targets_action, pe_code, action_dim, state_dim = SIRLU.loadTrajChain(before_migration_path, full_trajectory_path)
     print(inputs.shape,targets_action.shape,pe_code.shape)
     model = SIRLT.avril(inputs, targets_action, pe_code, state_dim, action_dim, state_only=True)
 
     # model.loadParams(model_dir + 'params_transformer_pe.pickle')
-    model.loadParams(save_dir + 'after_migrt/model/20190801.pickle')
+    model.loadParams(params_path)
     
     MAXCORES = cpu_count() - 1
 
     # read the list of location codes 
-    with open(data_dir + 'id_coords_mapping.pkl', 'rb') as f:
-        id_coords_mapping = pickle.load(f)
+    id_coords_mapping = SIRLU.load_id_coords_mapping(who)
     id_coorders_mapping = dict(sorted(id_coords_mapping.items()))
 
     # fulfill the representation by function
     pe_compressed = coords2compression(model, id_coorders_mapping.values(), depth=state_dim)
     print(pe_compressed.shape)
 
-    # read the policy-transition matrix
-    with open(save_dir + 'before_migrt_transition_prob.pkl', 'rb') as f:
-        res = pickle.load(f)
+    res = computeTransitionProb(model, who, date)
     transitionProbs, coordsIdx = np.array(res[0]), res[1]
 
     # Edit the transiton matrix and coordinates to remove the non-visited locations.
     transitionProbsEdit, id_coorders_mapping_edit = removeNonVisited(transitionProbs, id_coorders_mapping)
+    print("The shape of the transition matrix is: ", transitionProbsEdit.shape)
     # compute the stationary distribution
     stationary = computeTransLimit(transitionProbsEdit)
 
@@ -161,10 +225,6 @@ if __name__ == '__main__':
     print("Spatial distance computation finished.")
 
     # compute the transition relation distinction between points
-    # deprecated: reduce the dimension of the compressed representation to speed up
-    # pca = PCA(n_components=.95)
-    # pe_compressed_reduced = pca.fit_transform(pe_compressed)
-
     # compute the combination
     combine_pairs = [i for i in combinations(range(num_locs), 2)]
 
@@ -190,7 +250,7 @@ if __name__ == '__main__':
     spatial_distrib_params = lognorm.fit(spatial_dist[triu_idx], floc=0.0)
     social_distrib_params = lognorm.fit(social_dist[triu_idx], floc=0.0)
     # determine the clustering threshold by accounting for the distribution
-    threshold = clusterThres(spatial_distrib_params, social_distrib_params, alpha = 2)
+    threshold = clusterThres(spatial_distrib_params, social_distrib_params)
 
     # clustering the locations by agglomerative clustering
     aggClusterer = AgglomerativeClustering(None, metric='precomputed', distance_threshold=threshold,
@@ -202,8 +262,25 @@ if __name__ == '__main__':
     # get the number of clusters
     num_clusters = len(np.unique(cluster_labels))
     print("There are {} clusters in total.".format(num_clusters))
+    
+    # return the result
+    res = (transitionProbsEdit, id_coorders_mapping_edit, stationary, cluster_labels)
+    
+    return res
 
-    # save the cluster labels
-    with open(save_dir + 'cluster_results_august.pkl', 'wb') as f:
-        res = (transitionProbsEdit, id_coorders_mapping_edit, stationary, cluster_labels)
-        pickle.dump(res, f)
+
+if __name__ == '__main__':
+    model_dir = "./model/"
+    save_dir = "./product/topoMap/"
+    user_list = [name for name in os.listdir(model_dir) if name.isdigit()]
+    for user in user_list:
+        user_int = int(user)
+        migrt_date = SIRLU.migrationDate(user_int)
+        visit_dates = SIRLU.visited_date(user_int)
+        migrt_idx = visit_dates.index(migrt_date)
+        start_idx = migrt_idx - 1
+        recording_dates = visit_dates[start_idx::7]
+        for date in recording_dates:
+            res = clusterLocations(user_int, date)
+            with open(save_dir + f'{user}_{date:d}_cluster.pkl', 'wb') as f:
+                pickle.dump(res, f)
