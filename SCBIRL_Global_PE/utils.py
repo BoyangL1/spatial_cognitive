@@ -10,7 +10,7 @@ from collections import namedtuple
 from sklearn.preprocessing import MinMaxScaler
 
 TravelData = namedtuple('TravelChain', ['date', 'travel_chain','id_chain','fnid_chain'])
-
+Traveler = namedtuple('Traveler', ['who', 'visit_date'])
 
 def loadJsonFile(file_path):
     with open(file_path, 'r') as file:
