@@ -5,6 +5,9 @@ import SCBIRL_Global_PE.utils as SIRLU
 import SCBIRL_Global_PE.migrationProcess as SIRLP
 import Analysis.priorKnow as PriorKnow
 
+import jax
+jax.config.update('jax_platform_name', 'cpu')
+
 def train_model_one_traveler(who: int):
     data_dir = './data/user_data/{:09d}/'.format(who)
     model_dir = './model/{:09d}/'.format(who)
