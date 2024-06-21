@@ -302,8 +302,8 @@ def afterMigrt(model, dataPath, outputPath, start_date):
         if i < memory_buffer:
             iter_training_set = trajInitChains[-(memory_buffer-i):] + trajIterChains[:i]
         else:
-            iter_training_set = trajInitChains[i-memory_buffer:i]
-        iter_training_set = iter_training_set + [trajInitChains[i]]
+            iter_training_set = trajIterChains[i-memory_buffer:i]
+        iter_training_set = iter_training_set + [trajIterChains[i]]
 
         # Process and calculate reward values after migration.
         plugInDataPair(iter_training_set, stateAttribute, model, visitedState)
