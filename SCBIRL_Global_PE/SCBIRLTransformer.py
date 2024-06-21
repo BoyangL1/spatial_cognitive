@@ -35,7 +35,7 @@ class avril:
         action_dim: int,
         state_only: bool = True,
         num_layers: int = 2,
-        num_heads: int = 2,
+        num_heads: int = 1,
         dff = 28,
         rate = 0.1,
         seed: int = 41310,

@@ -9,21 +9,22 @@ working_directory = os.path.abspath('.')
 sys.path.append(working_directory)
 
 from SCBIRL_Global_PE.migrationProcess import *
+from SCBIRL_Global_PE.utils import plugInDataPair
 
-def experienceModel(model_no_prior, afterMigrtFile, beforeMigrtFile, full_trajectory_path, dataPath = './data/', outputPath = './data_pe/'):
-
+def experienceModel(model_no_prior, dataPath, outputPath, start_date):
+    full_traj_path = dataPath + "all_traj.json"
+    
     # Load the mapping between IDs and their corresponding fnid.
     with open(dataPath + "id_coords_mapping.pkl", "rb") as f:
         id_coords = pickle.load(f)
     with open(dataPath + "coords_fnid_mapping.pkl", "rb") as f:
         coords_fnid = pickle.load(f)
 
-    all_chains = loadTravelDataFromDicts(loadJsonFile(full_trajectory_path))
-    before_migrt_chains = loadTravelDataFromDicts(loadJsonFile(beforeMigrtFile))
+    all_chains = loadTravelDataFromDicts(loadJsonFile(full_traj_path))
     actionDim = getActionDim(all_chains)
 
     # Read and preprocess data for analysis.
-    visitedState, trajChains, stateAttribute = readAndPrepareData(afterMigrtFile, beforeMigrtFile, dataPath + 'all_traj_feature.csv')
+    visitedState, trajInitChains, trajIterChains, stateAttribute = readAndPrepareData(dataPath, start_date)
 
     # Initialize an empty DataFrame with predefined columns
     resultsDf = pd.DataFrame(columns=['coords', 'fnid'])
@@ -32,25 +33,25 @@ def experienceModel(model_no_prior, afterMigrtFile, beforeMigrtFile, full_trajec
         # Append the key-value pair as a new row to resultsDf
         resultsDf = resultsDf._append({'coords': key, 'fnid': value}, ignore_index=True)
 
-    modelDir = outputPath + "no_prior_model"
+    modelDir = outputPath + "no_prior_model/"
     if not os.path.exists(modelDir):
         os.makedirs(modelDir)
     memory_buffer = 10 # days
 
-    for i in range(len(trajChains)):
+    for i in range(len(trajIterChains)):
         model = copy.deepcopy(model_no_prior)   
         if i < memory_buffer:
-            before_chain = before_migrt_chains[-(memory_buffer-i):] + trajChains[:i]
+            iter_training_set = trajInitChains[-(memory_buffer-i):] + trajIterChains[:i]
         else:
-            before_chain = trajChains[i-memory_buffer:i]
-        train_chain = before_chain + [trajChains[i]]
+            iter_training_set = trajIterChains[i-memory_buffer:i]
+        iter_training_set = iter_training_set + [trajIterChains[i]]
 
         # Process and calculate reward values after migration.
         # rewardValues = processAfterMigrationData(train_chain, stateAttribute, model, visitedState, id_coords, coords_fnid, actionDim, outputPath)
-        plugInDataPair(train_chain, stateAttribute, model, visitedState)
-        # Train the model.
+        plugInDataPair(iter_training_set, stateAttribute, model, visitedState)
+        # Train the model. We get the model after the past of the date.
         model.train(iters=1000,loss_threshold=0.01)
 
         # Save the current model state.
-        modelSavePath = modelDir + "/" + str(train_chain[-1].date) + ".pickle"
+        modelSavePath = modelDir + str(iter_training_set[-1].date) + ".pickle"
         model.modelSave(modelSavePath)

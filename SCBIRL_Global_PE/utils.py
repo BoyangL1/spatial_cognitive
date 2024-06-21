@@ -31,31 +31,8 @@ def getActionDim(all_chains):
     # 去所有出行链中id 最大的一个编号, 加1为长度, 再加1为no action
     return max({id for tc in all_chains for id in tc.id_chain}) + 2 # id_chain is a sequence, so the length = max +1 +1
 
-def preprocessStateAttributes(traj_file, all_feature_path=None):
-    """
-    Preprocess state attributes from a trajectory file.
-
-    This function reads state attributes from a CSV file, adjusts the columns based on the trajectory file provided,
-    and scales the features using MinMaxScaler.
-
-    Args:
-        traj_file (str): Path to the trajectory file.
-        all_feature_path (str, optional): Path to the CSV file containing all trajectory features. 
-
-    Returns:
-        tuple: A tuple containing the preprocessed DataFrame and the dimension of state attributes (excluding 'fnid').
-    """
-    if all_feature_path is None:
-        all_feature_path = os.path.dirname(traj_file) + '/all_traj_feature.csv'
+def preprocessStateAttributes(all_feature_path):
     state_attribute = pd.read_csv(all_feature_path)
-
-    # Adjust columns based on the trajectory file
-    if traj_file.endswith('before_migrt.json'):
-        state_attribute.drop(columns=['post_home_distance'], inplace=True)
-        state_attribute.rename(columns={'pre_home_distance': 'home_distance'}, inplace=True)
-    else:
-        state_attribute.drop(columns=['pre_home_distance'], inplace=True)
-        state_attribute.rename(columns={'post_home_distance': 'home_distance'}, inplace=True)
 
     # Calculate the dimension of state attributes (excluding 'fnid')
     # 特征的维度，不是状态数
@@ -110,25 +87,26 @@ def padSequences(data_list, element_shape, padding_value=-999):
 
 def processTrajectoryData(traj_chains, state_attribute, s_dim):
     """
-    Process trajectory data to generate sequences of states, actions, and grids.
-    This function iterates through trajectory chains and processes each trajectory to generate sequences of
-    state-next_state, action-next_action, and grid-next_grid pairs.
+    Process trajectory data and return the processed data in the form of arrays.
 
     Args:
-        traj_chains (list): List of trajectory chain objects.
-        state_attribute (DataFrame): DataFrame containing state attributes.
-        s_dim (int): The dimension of state attributes.
-        place_grid_data (Dict): Dict containing place grid data.
+        traj_chains (list): List of trajectory chains.
+        state_attribute (str): Attribute to consider for state representation.
+        s_dim (int): Dimension of the state representation.
 
     Returns:
-        tuple: A tuple containing arrays of state-next_state pairs, action-next_action pairs, and grid-next_grid pairs.
+        tuple: A tuple containing three arrays:
+            - state_next_state (ndarray): Array of shape (num_chains, max_traj_len, 2, s_dim) representing the current and next states.
+            - action_next_action (ndarray): Array of shape (num_chains, max_traj_len, 2, 1) representing the current and next actions.
+            - pe_next_pe (ndarray): Array of shape (num_chains, max_traj_len, 2, nlevel*3) representing the current and next grid codes.
+
     """
     state_next_state = []
     action_next_action = []
     pe_next_pe = []
 
     for tc in traj_chains:
-        sns_chain,ana_chain,pnp_chain = [],[],[]
+        sns_chain, ana_chain, pnp_chain = [], [], []
         for t in range(len(tc.travel_chain)):
             # Get the final destination in the travel chain
             # destination = tc.travel_chain[-1]
@@ -146,6 +124,7 @@ def processTrajectoryData(traj_chains, state_attribute, s_dim):
         pe_next_pe.append(pnp_chain)
     # pad sequence to the same length
     # 把traj_len填充到最大的长度，变为max_traj_len, 其余值默认为-999填充
+    # todo: 考虑是否要长度对齐
     state_next_state = padSequences(state_next_state,s_n_s.shape) 
     action_next_action = padSequences(action_next_action,a_n_a.shape,padding_value=-1)
     pe_next_pe = padSequences(pe_next_pe,p_n_p.shape)
@@ -221,26 +200,46 @@ def processSingleTrajectory(tc, t, state_attribute, s_dim):
 
     return s_n_s, a_n_a, s_pe_s
 
-def loadTrajChain(traj_file, full_traj_path, num_trajs=None):
-    loaded_dicts_list1 = loadJsonFile(traj_file)
-    traj_chains = loadTravelDataFromDicts(loaded_dicts_list1)
-
-    all_chains = loadTravelDataFromDicts(loadJsonFile(full_traj_path))
-    a_dim = getActionDim(all_chains)
-
-    if num_trajs is not None:
-        traj_chains = traj_chains[:num_trajs]
+def loadTrajChain(user_path, type: str, start_date=None):
+    if type not in {'before', 'after', 'all'}:
+        raise ValueError("Invalid type. Must be one of 'before', 'after', or 'all'.")
     
-    state_attribute, s_dim = preprocessStateAttributes(traj_file)
-    state_next_state, action_next_action, grid_next_grid= processTrajectoryData(traj_chains, state_attribute, s_dim)
+    full_traj_path = user_path + 'all_traj.json'
+    all_trajs = loadJsonFile(full_traj_path)
+    if type == 'before':
+        trajs = [chain for chain in all_trajs if chain['date'] < start_date]
+    elif type == 'after':
+        trajs = [chain for chain in all_trajs if chain['date'] >= start_date]
+    else:
+        trajs = all_trajs.copy()
+    chains_loaded = loadTravelDataFromDicts(trajs)
+    a_dim = getActionDim(loadTravelDataFromDicts(all_trajs))
+    
+    full_feature_path = user_path + 'all_traj_feature.csv'
+    state_attribute, s_dim = preprocessStateAttributes(full_feature_path)
+    state_next_state, action_next_action, grid_next_grid= processTrajectoryData(chains_loaded, state_attribute, s_dim)
     # 这里的state_next_state是一个四维数组，第一维是轨迹条数，第二维是轨迹最大长度（即每条轨迹pair数），第三维是状态数（2），第四维是特征数
     # action_next_action是一个四维数组，第一维是轨迹条数，第二维是轨迹最大长度（即每条轨迹pair数），第三维是状态数（2），第四维是虚假轴
     # 第三个输出grid_next_grid是四维数组, dim(num_traj, max_traj_len, 2, nlevel)
     return state_next_state, action_next_action, grid_next_grid, a_dim, s_dim
     
-# below is utility function added by Cover Wu.    
+def plugInDataPair(tc, stateAttribute, model, visitedState):
+    # Preprocess trajectory data and update visited states
+    # 每次迭代，高维度数组的轨迹长度都是不一样的，都是本批次（10天内）最长的长度。
+    stateNextState, actionNextAction, peNextpe = processTrajectoryData(tc, stateAttribute, model.s_dim)
+    # 这里会更新去过的state
+    for t in tc:
+        visitedState.update(tuple(item) if isinstance(item, list) else item for item in t.travel_chain)
+
+    # Set model inputs for training or evaluation
+    model.inputs = stateNextState
+    model.targets = actionNextAction
+    model.pe_code = peNextpe
+
+
 def toWhoString(who: int):
     return '{:08d}'.format(who)
+
 
 def migrationDate(who: int = 36384703):
     # using the os path to get the after traj path

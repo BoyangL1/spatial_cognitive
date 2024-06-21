@@ -110,33 +110,39 @@ def getComputeFunction(model, attribute_type):
     else:
         raise ValueError("attribute_type should be either 'value' or 'reward'.")
 
-def readAndPrepareData(afterMigrtFile, beforeMigrtFile, inputPath):
+
+def readAndPrepareData(user_data_path, start_date):
     """
-    Read and prepare data for processing. This involves loading and preprocessing
-    data related to migration and travel chains.
+    Reads and prepares data for spatial cognition analysis.
 
     Args:
-        afterMigrtFile (str): The file path for data after migration.
-        beforeMigrtFile (str): The file path for data before migration.
-        inputPath (str): The directory path where input feature data is stored.
+        user_data_path (str): The path to the user data.
+        start_date (str): The start date for filtering travel chains.
 
     Returns:
-        set: A set of visited states extracted from before migration data.
-        list: A list of trajectory chains loaded from the after migration data.
-        DataFrame: A DataFrame containing state attributes.
+        tuple: A tuple containing the following:
+            - visitedState (set): A set of visited states before migration.
+            - trajChains (list): A list of travel chains after migration.
+            - stateAttribute (dict): A dictionary of preprocessed state attributes.
     """
+    all_traj_path = user_data_path + 'all_traj.json'
+    all_traj_feature_path = user_data_path + 'all_traj_feature.csv'
+    
     # Load and process the data of travel chains before migration.
-    beforeChains = loadJsonFile(beforeMigrtFile)
+    chains = loadJsonFile(all_traj_path)
+    beforeChains = [chain for chain in chains if chain['date'] < start_date]
     visitedState = {tuple(state) for chain in beforeChains for state in chain['travel_chain']}
+    trajInitChains = loadTravelDataFromDicts(beforeChains)
 
     # Load and process the data of travel chains after migration.
-    loadedDictsList1 = loadJsonFile(afterMigrtFile)
-    trajChains = loadTravelDataFromDicts(loadedDictsList1)
+    afterChains = [chain for chain in chains if chain['date'] >= start_date]
+    trajIterChains = loadTravelDataFromDicts(afterChains)
 
     # Preprocess state attributes based on the after migration data.
-    stateAttribute, _ = preprocessStateAttributes(afterMigrtFile, inputPath)
+    stateAttribute, _ = preprocessStateAttributes(all_traj_feature_path)
 
-    return visitedState, trajChains, stateAttribute
+    return visitedState, trajInitChains, trajIterChains, stateAttribute
+
 
 def processBeforeMigrationData(state_attribute, visitedState, computeFunc, id_coords, coords_fnid, actionDim):
     """
@@ -190,18 +196,6 @@ def processBeforeMigrationData(state_attribute, visitedState, computeFunc, id_co
     dfResults = pd.DataFrame(beforeMigrtTrans, columns=columns)
     dfResults.to_csv(f"./data_pe/before_migrt_transProb.csv", index=False)
 
-def plugInDataPair(tc, stateAttribute, model, visitedState):
-    # Preprocess trajectory data and update visited states
-    # 每次迭代，高维度数组的轨迹长度都是不一样的，都是本批次（10天内）最长的长度。
-    stateNextState, actionNextAction, peNextpe = processTrajectoryData(tc, stateAttribute, model.s_dim)
-    # 这里会更新去过的state
-    for t in tc:
-        visitedState.update(tuple(item) if isinstance(item, list) else item for item in t.travel_chain)
-
-    # Set model inputs for training or evaluation
-    model.inputs = stateNextState
-    model.targets = actionNextAction
-    model.pe_code = peNextpe
 
 def processAfterMigrationData(tc, stateAttribute, model, visitedState, id_coords, coords_fnid, actionDim, outputPath="./data_pe/"):
     """
@@ -275,30 +269,20 @@ def processAfterMigrationData(tc, stateAttribute, model, visitedState, id_coords
 
 
 
-def afterMigrt(model, afterMigrtFile, beforeMigrtFile, full_trajectory_path, model_load_path='./model/params_transformer_pe.pickle', 
-               inputPath = './data/', outputPath = './data_pe/'):
-    # Load model parameters from a saved state.
-    model.loadParams(model_load_path)
-    # Get the model save directory
-    modelSaveDir = os.path.dirname(model_load_path) + '/'
+def afterMigrt(model, dataPath, outputPath, start_date):
+    full_traj_path = dataPath + "all_traj.json"
+
     # Load the mapping between IDs and their corresponding fnid.
-    with open(inputPath + "id_coords_mapping.pkl", "rb") as f:
+    with open(dataPath + "id_coords_mapping.pkl", "rb") as f:
         id_coords = pickle.load(f)
-    with open(inputPath + "coords_fnid_mapping.pkl", "rb") as f:
+    with open(dataPath + "coords_fnid_mapping.pkl", "rb") as f:
         coords_fnid = pickle.load(f)
 
-    # Define a function to compute Q-values given a state and corresponding grid_code.
-    computeFunc = lambda state, grid_code: model.QValue(state,grid_code)
-
-    all_chains = loadTravelDataFromDicts(loadJsonFile(full_trajectory_path))
-    before_migrt_chains = loadTravelDataFromDicts(loadJsonFile(beforeMigrtFile))
+    all_chains = loadTravelDataFromDicts(loadJsonFile(full_traj_path))
     actionDim = getActionDim(all_chains)
 
     # Read and preprocess data for analysis.
-    visitedState, trajChains, stateAttribute = readAndPrepareData(afterMigrtFile, beforeMigrtFile, inputPath + 'all_traj_feature.csv')
-
-    # Process and update state attributes before migration.
-    processBeforeMigrationData(stateAttribute, visitedState, computeFunc, id_coords, coords_fnid, actionDim)
+    visitedState, trajInitChains, trajIterChains, stateAttribute = readAndPrepareData(dataPath, start_date)
 
     # Initialize an empty DataFrame with predefined columns
     resultsDf = pd.DataFrame(columns=['coords', 'fnid'])
@@ -308,37 +292,25 @@ def afterMigrt(model, afterMigrtFile, beforeMigrtFile, full_trajectory_path, mod
         resultsDf = resultsDf._append({'coords': key, 'fnid': value}, ignore_index=True)
 
 
-    modelDir = modelSaveDir + "evolution_model/"
+    modelDir = outputPath + "evolution_model/"
     if not os.path.exists(modelDir):
         os.makedirs(modelDir)
-    preDate = 0 # load preDate model parameters
     memory_buffer = 10 # days
 
-    for i in range(len(trajChains)):
-        if preDate:
-            modelPath = os.path.join(modelDir, f"{preDate}.pickle")
-            model.loadParams(modelPath)
+    for i in range(len(trajIterChains)):
 
         if i < memory_buffer:
-            before_chain = before_migrt_chains[-(memory_buffer-i):] + trajChains[:i]
+            iter_training_set = trajInitChains[-(memory_buffer-i):] + trajIterChains[:i]
         else:
-            before_chain = trajChains[i-memory_buffer:i]
-        train_chain = before_chain + [trajChains[i]]
+            iter_training_set = trajInitChains[i-memory_buffer:i]
+        iter_training_set = iter_training_set + [trajInitChains[i]]
 
         # Process and calculate reward values after migration.
-        rewardValues = processAfterMigrationData(train_chain, stateAttribute, model, visitedState, id_coords, coords_fnid, actionDim, outputPath)
+        plugInDataPair(iter_training_set, stateAttribute, model, visitedState)
 
         # Train the model.
         model.train(iters=1000,loss_threshold=0.01)
 
         # Save the current model state.
-        modelSavePath = modelSaveDir + "evolution_model/" + str(train_chain[-1].date) + ".pickle"
+        modelSavePath = modelDir + 'iterated_model_' + str(iter_training_set[-1].date) + ".pickle"
         model.modelSave(modelSavePath)
-
-        # Store the calculated reward values in the results DataFrame.
-        resultsDf[str(train_chain[-1].date)] = rewardValues
-
-        preDate = train_chain[-1].date
-
-    # Save results.
-    resultsDf.to_csv(outputPath + 'after_migrt_reward.csv', index=False)
