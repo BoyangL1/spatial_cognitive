@@ -267,9 +267,9 @@ if __name__ == "__main__":
     '''
     Hand Version
     '''
-    # i = 4
-    # who = wholist[i]
-    # res = dict()
-    # res[who] = personInterpretEvaluation(who)    
-    # with open('./product/interpretEvo_{:d}.pkl'.format(i), 'wb') as file:
-    #     pickle.dump(res, file)    
+    i = 0
+    who = wholist[i]
+    res = dict()
+    res[who] = personInterpretEvaluation(who)    
+    with open('./product/interpretEvo_{:09d}.pkl'.format(i), 'wb') as file:
+        pickle.dump(res, file)    

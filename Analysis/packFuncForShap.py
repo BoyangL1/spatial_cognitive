@@ -258,25 +258,25 @@ if __name__ == '__main__':
     '''
     By Hand
     '''
-    # model_dir = './model/'
-    # user_list = [int(name) for name in os.listdir(model_dir) if name.isdigit()]
-    # user_list.sort()
-
-    # user = user_list[9]
-    # res = explainOneUser(user, parallel=False)
-    # with open('./product/shap_res_{:08d}.pkl'.format(user), 'wb') as f:
-    #     pickle.dump(res, f)
-    '''
-    Inspect the baseline.
-    '''
     model_dir = './model/'
     user_list = [int(name) for name in os.listdir(model_dir) if name.isdigit()]
     user_list.sort()
-    reward_dict = dict()
-    for user in user_list:
-        date_list = modelDateOfUser(user)
-        for date in date_list:
-            reward_dict[(user, date)] = modelRewardCalculation(date, who=user)
-            with open('./product/reward_res.pkl', 'wb') as f:
-                    pickle.dump(reward_dict, f)
+
+    user = user_list[0]
+    res = explainOneUser(user, parallel=True)
+    with open('./product/shap_res_{:08d}.pkl'.format(user), 'wb') as f:
+        pickle.dump(res, f)
+    '''
+    Inspect the baseline.
+    '''
+    # model_dir = './model/'
+    # user_list = [int(name) for name in os.listdir(model_dir) if name.isdigit()]
+    # user_list.sort()
+    # reward_dict = dict()
+    # for user in user_list:
+    #     date_list = modelDateOfUser(user)
+    #     for date in date_list:
+    #         reward_dict[(user, date)] = modelRewardCalculation(date, who=user)
+    #         with open('./product/reward_res.pkl', 'wb') as f:
+    #                 pickle.dump(reward_dict, f)
             

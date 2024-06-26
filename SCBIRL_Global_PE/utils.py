@@ -278,9 +278,9 @@ def load_all_traj(who: int):
     loaded_namedtuples_all = [TravelData(**d) for d in loaded_dicts_all]
     return loaded_namedtuples_all
 
-def load_state_attrs(who: int, before=True):
+def load_state_attrs(who: int):
     data_dir = f'./data/user_data/'
-    filename = 'all.traj.json'
+    filename = 'all_traj_feature.csv'
     
     traj_path = data_dir + toWhoString(who) + '/' + filename
     state_attribute, _ = preprocessStateAttributes(traj_path)

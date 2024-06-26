@@ -28,13 +28,16 @@ import pickle
 import SCBIRL_Global_PE.SCBIRLTransformer as SIRLT
 import SCBIRL_Global_PE.migrationProcess as SIRLP
 import SCBIRL_Global_PE.utils as SIRLU
+from SCBIRL_Global_PE.utils import iter_start_date
 from TRAJ_PROCESS.prepareChain import Traveler
 
 from scipy.spatial import distance_matrix
 # note: scipy wasserstein function is too slow.
-from scipy.stats import wasserstein_distance_nd, lognorm
+# from scipy.stats import wasserstein_distance_nd, lognorm
+from scipy.stats import lognorm
 import ot
-
+import jax
+jax.config.update('jax_platform_name', 'cpu')
 
 from sklearn.cluster import AgglomerativeClustering
 from itertools import combinations
@@ -53,7 +56,7 @@ def coords2compression(model, coords, depth: int):
     key = model.key
     c_params = model.c_params
     pe_real_compressed, pe_imag_compressed = model.compress_pe_code_complex.apply(c_params, key, gc_vectors, target_dim=depth)
-    # transform the gc patterns to compressed representation, 14D vector
+    # transform the gc patterns to compressed representation, 13D vector
     pe_compressed = pe_real_compressed + pe_imag_compressed
     return pe_compressed
 
@@ -127,14 +130,11 @@ def computeTransitionProb(model, who, date):
     """
     Compute transition probabilities for each state using a given model and save to a CSV file.
     """
-    if date < SIRLU.migrationDate(who):
-        state_traj_src = f'./data/user_data/{who:08d}/before_migrt.json'
-    else:
-        state_traj_src = f'./data/user_data/{who:08d}/after_migrt.json'
+    who_string = SIRLU.toWhoString(who)
+        
+    state_attribute = SIRLU.load_state_attrs(who)
     
-    state_attribute, _ = SIRLU.preprocessStateAttributes(state_traj_src)
-    
-    all_traj_src = f'./data/user_data/{who:08d}/all_traj.json'
+    all_traj_src = './data/user_data/%s/all_traj.json' % (who_string,)
     all_traj_dict = SIRLU.loadJsonFile(all_traj_src)
     chains_dict = filter(lambda x: x['date'] <= date, all_traj_dict)
 
@@ -174,23 +174,20 @@ def computeTransitionProb(model, who, date):
 
 
 def clusterLocations(who, date):
-
-    data_dir = './data/' + f'user_data/{who:08d}/'
-    model_dir = './model/' + f'{who:08d}/'
-    save_dir = './product/' + f'{who:08d}/'
+    who_string = SIRLU.toWhoString(who) + '/'
+    data_dir = './data/' + 'user_data/' + who_string
+    model_dir = './model/' + who_string
+    save_dir = './product/' + who_string
 
     # Paths for data files
-    before_migration_path = data_dir + 'before_migrt.json'
-    after_migration_path = data_dir + 'after_migrt.json'
     full_trajectory_path = data_dir + 'all_traj.json'
 
-    migrt_date = SIRLU.migrationDate(who)
-    if date >= migrt_date:
-        params_path = model_dir + f'evolution_model/{date:d}.pickle'
+    if date >= iter_start_date:
+        params_path = model_dir + f'evolution_model/iterated_model_{date:d}.pickle'
     else:
-        params_path = model_dir + f'before_migrt_model.pickle'
+        params_path = model_dir + f'initial_model.pickle'
     
-    inputs, targets_action, pe_code, action_dim, state_dim = SIRLU.loadTrajChain(before_migration_path, full_trajectory_path)
+    inputs, targets_action, pe_code, action_dim, state_dim = SIRLU.loadTrajChain(data_dir, type='before', start_date=iter_start_date)
     print(inputs.shape,targets_action.shape,pe_code.shape)
     model = SIRLT.avril(inputs, targets_action, pe_code, state_dim, action_dim, state_only=True)
 
@@ -273,14 +270,17 @@ if __name__ == '__main__':
     model_dir = "./model/"
     save_dir = "./product/topoMap/"
     user_list = [name for name in os.listdir(model_dir) if name.isdigit()]
+    user_list = user_list[0:1]
     for user in user_list:
         user_int = int(user)
-        migrt_date = SIRLU.migrationDate(user_int)
+        migrt_date = iter_start_date
         visit_dates = SIRLU.visited_date(user_int)
         migrt_idx = visit_dates.index(migrt_date)
         start_idx = migrt_idx - 1
         recording_dates = visit_dates[start_idx::7]
+        res_dict = dict()
         for date in recording_dates:
             res = clusterLocations(user_int, date)
-            with open(save_dir + f'{user}_{date:d}_cluster.pkl', 'wb') as f:
-                pickle.dump(res, f)
+            res_dict[date] = res
+            with open(save_dir + f'topo_cluster_user1.pkl', 'wb') as f:
+                pickle.dump(res_dict, f)
