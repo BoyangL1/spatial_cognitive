@@ -11,6 +11,8 @@ from sklearn.preprocessing import MinMaxScaler
 
 TravelData = namedtuple('TravelChain', ['date', 'travel_chain','id_chain','fnid_chain'])
 Traveler = namedtuple('Traveler', ['who', 'visit_date'])
+iter_start_date = 20230501
+
 
 def loadJsonFile(file_path):
     with open(file_path, 'r') as file:
@@ -237,8 +239,8 @@ def plugInDataPair(tc, stateAttribute, model, visitedState):
     model.pe_code = peNextpe
 
 
-def toWhoString(who: int):
-    return '{:08d}'.format(who)
+def toWhoString(who: int, digits=9):
+    return '{:0{digits}d}'.format(who, digits=digits)
 
 
 def migrationDate(who: int = 36384703):
@@ -278,7 +280,7 @@ def load_all_traj(who: int):
 
 def load_state_attrs(who: int, before=True):
     data_dir = f'./data/user_data/'
-    filename = 'before_migrt.json' if before else 'after_migrt.json'
+    filename = 'all.traj.json'
     
     traj_path = data_dir + toWhoString(who) + '/' + filename
     state_attribute, _ = preprocessStateAttributes(traj_path)

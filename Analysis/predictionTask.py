@@ -9,10 +9,11 @@ import SCBIRL_Global_PE.SCBIRLTransformer as SIRLT
 import SCBIRL_Global_PE.utils as SIRLU
 from SCBIRL_Global_PE.migrationProcess import *
 import packFuncForShap as pack4shap
-from SCBIRL_Global_PE.utils import TravelData
+from SCBIRL_Global_PE.utils import TravelData, iter_start_date
 from TRAJ_PROCESS.prepareChain import Traveler
 from geopy.distance import geodesic
 import pickle
+
 
 def trajectoryCompute(model, tcs: list[TravelData], state_attribute: pd.DataFrame):
     '''
@@ -82,7 +83,7 @@ def modelEvaluation(model, who: int, start_date: int, end_date: int, mode: str, 
     
     assert mode in ['reward', 'action'], "The mode should be either 'reward' or 'action'."
     # 读入建成环境数据  
-    state_attribute = SIRLU.load_state_attrs(who, before=False)
+    state_attribute = SIRLU.load_state_attrs(who)
     
     # 读入所有的轨迹数据，这里的I/O函数都解耦了
     loaded_namedtuples_all = SIRLU.load_all_traj(who)
@@ -196,7 +197,7 @@ def stepwise_kl_div_compute(df_1: pd.DataFrame, df_2: pd.DataFrame):
 def personInterpretEvaluation(who: int):
     traveler = load_traveler(who)
     
-    migrtdate = traveler.migrt
+    migrtdate = iter_start_date
     visitdate = traveler.visit_date
     # create a list of dates for evolution evaluation
     evoludate = list(filter(lambda d: d > migrtdate, visitdate))

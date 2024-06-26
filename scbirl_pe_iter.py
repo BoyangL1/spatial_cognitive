@@ -4,6 +4,7 @@ import SCBIRL_Global_PE.SCBIRLTransformer as SIRLT
 import SCBIRL_Global_PE.utils as SIRLU
 import SCBIRL_Global_PE.migrationProcess as SIRLP
 import Analysis.priorKnow as PriorKnow
+from SCBIRL_Global_PE.utils import iter_start_date
 
 import jax
 jax.config.update('jax_platform_name', 'cpu')
@@ -12,8 +13,7 @@ def train_model_one_traveler(who: int):
     data_dir = './data/user_data/{:09d}/'.format(who)
     model_dir = './model/{:09d}/'.format(who)
     
-    iter_start_date = 20230501
-    
+    # here the `iter_start_date` is a constant defined by utility module.
     inputs, targets_action, pe_code, action_dim, state_dim = SIRLU.loadTrajChain(data_dir, type='before', start_date=iter_start_date)
     print(inputs.shape, targets_action.shape, pe_code.shape)
     model = SIRLT.avril(inputs, targets_action, pe_code, state_dim, action_dim, state_only=True)
