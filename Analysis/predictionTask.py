@@ -251,25 +251,26 @@ def personInterpretEvaluation(who: int):
 if __name__ == "__main__":
 
     
-    wholist = [int(f) for f in os.listdir('./model/')]
+    wholist = [int(f) for f in os.listdir('./model/') if f.isdigit()]
     wholist.sort()
     '''
     Parallel Verison
     '''
-    # import multiprocessing as mp
-    # CPU_COUNT = len(wholist)
-    # with mp.Pool(CPU_COUNT) as pool:
-    #     iterDfs = pool.map(personInterpretEvaluation, wholist)
+    import multiprocessing as mp
+    CPU_COUNT = len(wholist)
+    CPU_COUNT = 16
+    with mp.Pool(CPU_COUNT) as pool:
+        iterDfs = pool.map(personInterpretEvaluation, wholist)
 
-    # with open('./product/iterationEvo.pkl', 'wb') as file:
-    #     pickle.dump(iterDfs, file)
+    with open('./product/iterationEvo.pkl', 'wb') as file:
+        pickle.dump(iterDfs, file)
     
     '''
     Hand Version
     '''
-    i = 0
-    who = wholist[i]
-    res = dict()
-    res[who] = personInterpretEvaluation(who)    
-    with open('./product/interpretEvo_{:09d}.pkl'.format(i), 'wb') as file:
-        pickle.dump(res, file)    
+    # i = 0
+    # who = wholist[i]
+    # res = dict()
+    # res[who] = personInterpretEvaluation(who)    
+    # with open('./product/interpretEvo_{:09d}.pkl'.format(i), 'wb') as file:
+    #     pickle.dump(res, file)    

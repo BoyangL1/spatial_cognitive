@@ -41,20 +41,18 @@ if __name__ =="__main__":
     '''
     # import multiprocessing as mp
     
-    # MAX_CPU_COUNT = 6
-    # done_who = [6854307, 21410711, 33816672, 37852495]
+    # MAX_CPU_COUNT = mp.cpu_count()
+    # done_who = [1102234]
+    # undone_who = [93854949, 102181433]
     # import os
-    # file_list = os.listdir('./data/user_chains/')
-    # pid_list = [s.rstrip('.csv').split('_')[-1] for s in file_list]
-    # who_list = [int(pid) for pid in pid_list]
+    # file_list = os.listdir('./data/user_data/')
+    # who_list = [int(pid) for pid in file_list]
     # for who in done_who:
     #     who_list.remove(who)
-
     # with mp.Pool(MAX_CPU_COUNT) as pool:
     #     pool.map(train_model_one_traveler, who_list)
-
 
     '''
         Terminal Version
     '''
-    train_model_one_traveler(who = 1102234)
+    train_model_one_traveler(who = 102181433)
