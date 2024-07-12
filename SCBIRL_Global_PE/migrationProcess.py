@@ -309,7 +309,8 @@ def afterMigrt(model, dataPath, outputPath, start_date):
         plugInDataPair(iter_training_set, stateAttribute, model, visitedState)
 
         # Train the model.
-        model.train(iters=1000,loss_threshold=0.01)
+        weights = [1 / 2 ** (memory_buffer - i) for i in range(memory_buffer)]
+        model.train(iters=1000,loss_threshold=0.01, weights=weights)
 
         # Save the current model state.
         modelSavePath = modelDir + 'iterated_model_' + str(iter_training_set[-1].date) + ".pickle"
