@@ -284,9 +284,9 @@ class avril:
         ).squeeze(axis=2).flatten()
         neg_log_lik = neg_log_lik[valid_indices]
         
-        if weights:
+        if weights is not None:
             assert len(inputs) == len(weights), 'The length of valid states and weights should be the same.'
-            weights = np.array(weights).repeat(inputs.shape[1])
+            weights = weights.repeat(inputs.shape[1])
             weights = weights[valid_indices]
 
 
@@ -294,9 +294,9 @@ class avril:
         kl = np.average(kl, weights=weights)
         irl_loss = np.average(irl_loss, weights=weights)
 
-        return neg_log_lik + kl + lambda_value*irl_loss
+        return neg_log_lik + kl + lambda_value * irl_loss
     
-    def train(self, iters: int = 1000, batch_size: int = 64, l_rate: float = 1e-4, 
+    def train(self, iters: int = 1000, batch_size: int = 64, l_rate: float = 1e-2, 
               loss_threshold: float = 0.01, weights = None):
         """
         Training function for the model.
@@ -314,6 +314,7 @@ class avril:
         inputs = self.inputs
         targets = self.targets
         pe_code = self.pe_code
+        weights = np.array(weights)
 
         init_fun, update_fun, get_params = optimizers.adam(l_rate)
         update_fun = jit(update_fun)
@@ -345,10 +346,10 @@ class avril:
 
             key, subkey = random.split(key)
 
-            lik, g_params = loss_grad(params, key, inputs[indexs], targets[indexs], pe_code[indexs], weights = weights)
+            lik, g_params = loss_grad(params, key, inputs[indexs], targets[indexs], pe_code[indexs], weights = weights[indexs])
 
             loss_diff = abs(lik-lik_pre)
-            print(loss_diff,lik)
+            print(lik-lik_pre, lik)
             if loss_diff < loss_threshold:
                 print(f"Training stopped at iteration {itr} as loss {loss_diff} is below the threshold {loss_threshold}")
                 break

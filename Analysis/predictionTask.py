@@ -9,8 +9,7 @@ import SCBIRL_Global_PE.SCBIRLTransformer as SIRLT
 import SCBIRL_Global_PE.utils as SIRLU
 from SCBIRL_Global_PE.migrationProcess import *
 import packFuncForShap as pack4shap
-from SCBIRL_Global_PE.utils import TravelData, iter_start_date
-from TRAJ_PROCESS.prepareChain import Traveler
+from SCBIRL_Global_PE.utils import TravelData, Traveler
 from geopy.distance import geodesic
 import pickle
 
@@ -196,16 +195,18 @@ def stepwise_kl_div_compute(df_1: pd.DataFrame, df_2: pd.DataFrame):
 
 def personInterpretEvaluation(who: int):
     traveler = load_traveler(who)
-    
-    migrtdate = iter_start_date
+    migrtdate = SIRLU.load_traveler(who).iter_start_date
+
     visitdate = traveler.visit_date
     # create a list of dates for evolution evaluation
     evoludate = list(filter(lambda d: d > migrtdate, visitdate))
     # create buffer range: 10 future days and the date itself
     evolution_buffer = 10 + 1
 
-    pr_contrib_list = []
+    re_contrib_list = []
     exp_contrib_list = []
+    pr_contrib_list = []
+    acu_contrib_list = []
     for one_evolution_date in evoludate:
         # find the position of the evolution date
         evolution_pos = evoludate.index(one_evolution_date)
@@ -220,32 +221,42 @@ def personInterpretEvaluation(who: int):
         start_date = evolution_date_range[0]
         end_date = evolution_date_range[-1]
         
+        prior_model = pack4shap.loadModel(who=who, )
         if evolution_pos < 10:
-            prior_model = pack4shap.loadModel(who=who, )
+            recent_knowledge_model = prior_model
         else:
             prior_evolution_date = evoludate[evolution_pos - 10]
-            prior_model = pack4shap.loadModel(who=who, date=prior_evolution_date, prior=True)
+            recent_knowledge_model = pack4shap.loadModel(who=who, date=prior_evolution_date, prior=True)
 
-        experience_model = pack4shap.loadModel(who=who, date=one_evolution_date, prior=False)
+        recent_experience_model = pack4shap.loadModel(who=who, date=one_evolution_date, prior=False)
 
+        accumulated_experience_model = pack4shap.loadModel(who=who, date=one_evolution_date, prior=False, accumulate=True)
+        
         complete_model = pack4shap.loadModel(who=who, date=one_evolution_date, prior=True)
 
         tabula_rasa_model = pack4shap.loadModel(who=who, tabular=True)
 
+        df_recent = modelEvaluation(recent_knowledge_model, who, start_date, end_date, mode='reward')
+        df_experience = modelEvaluation(recent_experience_model, who, start_date, end_date, mode='reward')
         df_prior = modelEvaluation(prior_model, who, start_date, end_date, mode='reward')
-        df_experience = modelEvaluation(experience_model, who, start_date, end_date, mode='reward')
+        df_accumknow = modelEvaluation(accumulated_experience_model, who, start_date, end_date, mode='reward')
         df_complete = modelEvaluation(complete_model, who, start_date, end_date, mode='reward')
         df_tabular = modelEvaluation(tabula_rasa_model, who, start_date, end_date, mode='reward')
         
-        prior_contrib = 0.5 * stepwise_kl_div_compute(df_tabular, df_prior) + 0.5 * stepwise_kl_div_compute(df_experience, df_complete)
-        exper_contrib = 0.5 * stepwise_kl_div_compute(df_tabular, df_experience) + 0.5 * stepwise_kl_div_compute(df_prior, df_complete)
-        pr_contrib_list.append(prior_contrib)
-        exp_contrib_list.append(exper_contrib)
+        recen_contrib = 0.5 * stepwise_kl_div_compute(df_tabular, df_recent) + 0.5 * stepwise_kl_div_compute(df_experience, df_complete)
+        exper_contrib = 0.5 * stepwise_kl_div_compute(df_tabular, df_experience) + 0.5 * stepwise_kl_div_compute(df_recent, df_complete)
+        prior_contrib = 0.5 * stepwise_kl_div_compute(df_tabular, df_prior) + 0.5 * stepwise_kl_div_compute(df_accumknow, df_complete)
+        accum_contrib = 0.5 * stepwise_kl_div_compute(df_tabular, df_accumknow) + 0.5 * stepwise_kl_div_compute(df_prior, df_complete)
+        pr_contrib_list.append(prior_contrib); re_contrib_list.append(recen_contrib)
+        exp_contrib_list.append(exper_contrib); acu_contrib_list.append(accum_contrib)
     
     # result in the form of a dataframe
     result_df = pd.DataFrame({'date': evoludate[:len(pr_contrib_list)], 
+                              're_contrib': re_contrib_list,
+                              'exp_contrib': exp_contrib_list,
                               'pr_contrib': pr_contrib_list, 
-                              'exp_contrib': exp_contrib_list})
+                              'acu_contrib': acu_contrib_list,
+                              })
     return result_df
 
 if __name__ == "__main__":

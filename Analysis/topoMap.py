@@ -28,7 +28,6 @@ import pickle
 import SCBIRL_Global_PE.SCBIRLTransformer as SIRLT
 import SCBIRL_Global_PE.migrationProcess as SIRLP
 import SCBIRL_Global_PE.utils as SIRLU
-from SCBIRL_Global_PE.utils import iter_start_date
 from TRAJ_PROCESS.prepareChain import Traveler
 
 from scipy.spatial import distance_matrix
@@ -178,6 +177,7 @@ def clusterLocations(who, date):
     data_dir = './data/' + 'user_data/' + who_string
     model_dir = './model/' + who_string
     save_dir = './product/' + who_string
+    iter_start_date = SIRLU.load_traveler(who).iter_start_date
 
     # Paths for data files
     full_trajectory_path = data_dir + 'all_traj.json'

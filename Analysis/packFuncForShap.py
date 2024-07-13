@@ -7,7 +7,7 @@ sys.path.append(working_directory)
 import SCBIRL_Global_PE.SCBIRLTransformer as SIRLT
 import SCBIRL_Global_PE.utils as SIRLU
 import SCBIRL_Global_PE.migrationProcess as SIRLM
-from SCBIRL_Global_PE.utils import TravelData
+from SCBIRL_Global_PE.utils import TravelData, Traveler
 
 import numpy as np
 import pandas as pd
@@ -17,7 +17,6 @@ from itertools import repeat, chain
 from functools import partial
 import pickle
 import multiprocessing as mp
-from SCBIRL_Global_PE.utils import iter_start_date
 
 # if gpu is not useful, force to use cpu
 import jax
@@ -28,7 +27,7 @@ jax.config.update('jax_platform_name', 'cpu')
 MAX_CPU_COUNT = 48
 
  
-def loadModel(who, date = None, prior = True, tabular = False):
+def loadModel(who, date = None, prior = True, accumulate = False, tabular = False):
     '''
         Load the model from the model directory.
         Must correctly set the directory at first.
@@ -36,17 +35,20 @@ def loadModel(who, date = None, prior = True, tabular = False):
     data_dir = './data/user_data/' + SIRLU.toWhoString(who) + '/'
     model_dir = './model/' + SIRLU.toWhoString(who) + '/'
     
+    iter_start_date = SIRLU.load_traveler(who).iter_start_date
     inputs, targets_action, pe_code, action_dim, state_dim = SIRLU.loadTrajChain(data_dir, type='before', start_date=iter_start_date)
     print(inputs.shape, targets_action.shape, pe_code.shape)
     model = SIRLT.avril(inputs, targets_action, pe_code, state_dim, action_dim, state_only=True)
     if tabular: 
         return model
-
+    
     if date is None or date < iter_start_date:
         path = model_dir + 'initial_model.pickle'
     else:
         if prior:
             modeltype = 'evolution_model/iterated_model_'        
+        elif accumulate:
+            modeltype = 'empirical_model/increased_model_'
         else:
             modeltype = 'no_prior_model/ignorant_model_'
         path = model_dir + modeltype + '{date}.pickle'.format(date=date)
@@ -132,6 +134,17 @@ def grouped_shap(shap_vals, features, groups):
     shap_grouped = shap_Tdf.groupby('group').sum().T
     return shap_grouped
 
+
+def sparseBackground(dataset: np.array):
+    column_name = ['C{:02d}'.format(i) for i in range(dataset.shape[1])]
+    background_df = pd.DataFrame(dataset, columns=column_name)
+    # count the unique values with its frequency
+    background_val_freq = background_df.groupby(column_name).size().reset_index(name='freq')
+    background_uni = background_val_freq.drop(columns=['freq']).to_numpy()
+    background_weight = background_val_freq['freq'].to_numpy()
+    return background_uni, background_weight
+    
+
 def modelRewardExplain(date: int, who: int):
     '''
         Give the SHAP value by grouping the type.
@@ -142,7 +155,7 @@ def modelRewardExplain(date: int, who: int):
     modelPredWrapper = partial(modelPredict, model=model, attribute_type='reward')
 
     dataset = backgroundData(who=who, date=date)
-    dataset_uni = np.unique(dataset, axis=0)
+    dataset_uni, dataset_freq = sparseBackground(dataset)
     print('Data with {k} rows'.format(k=dataset_uni.shape[0]))
 
     built_bench = np.zeros(model.s_dim).reshape(1, -1)
@@ -164,7 +177,7 @@ def modelRewardExplain(date: int, who: int):
     }
 
     shap_grouped_by_classes = grouped_shap(shap_vals=shap_values.values, features=varname, groups=groupmap)
-    return shap_grouped_by_classes
+    return shap_grouped_by_classes, dataset_freq
 
 def modelUserDateCombination():
     model_dir = './model/'
@@ -233,9 +246,9 @@ def modelRewardCalculation(date: int, who: int = 36384703):
     modelPredWrapper = partial(modelPredict, model=model, attribute_type='reward')
 
     dataset = backgroundData(who=who, date = date)
-    dataset_uni = np.unique(dataset, axis=0)
+    dataset_uni, dataset_freq = sparseBackground(dataset)
     reward_comp = modelPredWrapper(dataset_uni)
-    res = np.mean(np.abs(reward_comp))
+    res = np.average(np.abs(reward_comp), weights=dataset_freq)
     return res
 
 
@@ -243,9 +256,9 @@ if __name__ == '__main__':
     '''
     Full Parallel Version
     '''
-    res = explainAllRewards(parallel=True)
-    with open('./product/shap_res.pkl', 'wb') as f:
-        pickle.dump(res, f)
+    # res = explainAllRewards(parallel=True)
+    # with open('./product/shap_res.pkl', 'wb') as f:
+    #     pickle.dump(res, f)
     
     '''
     Half Parallel Version
@@ -271,14 +284,14 @@ if __name__ == '__main__':
     '''
     Inspect the baseline.
     '''
-    # model_dir = './model/'
-    # user_list = [int(name) for name in os.listdir(model_dir) if name.isdigit()]
-    # user_list.sort()
-    # reward_dict = dict()
-    # for user in user_list:
-    #     date_list = modelDateOfUser(user)
-    #     for date in date_list:
-    #         reward_dict[(user, date)] = modelRewardCalculation(date, who=user)
-    #         with open('./product/reward_res.pkl', 'wb') as f:
-    #                 pickle.dump(reward_dict, f)
+    model_dir = './model/'
+    user_list = [int(name) for name in os.listdir(model_dir) if name.isdigit()]
+    user_list.sort()
+    reward_dict = dict()
+    for user in user_list:
+        date_list = modelDateOfUser(user)
+        for date in date_list:
+            reward_dict[(user, date)] = modelRewardCalculation(date, who=user)
+            with open('./product/reward_res.pkl', 'wb') as f:
+                    pickle.dump(reward_dict, f)
             
