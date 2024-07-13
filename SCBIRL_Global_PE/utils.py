@@ -11,7 +11,7 @@ from sklearn.preprocessing import MinMaxScaler
 
 TravelData = namedtuple('TravelChain', ['date', 'travel_chain','id_chain','fnid_chain'])
 Traveler = namedtuple('Traveler', ['who', 'visit_date'])
-iter_start_date = 20230501
+iter_start_date = 20231001
 
 
 def loadJsonFile(file_path):

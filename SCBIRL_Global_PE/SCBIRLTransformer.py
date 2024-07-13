@@ -213,8 +213,6 @@ class avril:
         
         # calculate the kl difference between current reward and pre reward 
         means, log_sds, enc_output = getRewardParameters(e_params, 0)
-        
-
         # calculate td error
         # calculate Q-values for current state
         q_values = self.q_network.apply(
@@ -281,13 +279,13 @@ class avril:
 
         # Calculate log-likelihood of actions
         pred = jax.nn.log_softmax(q_values)
-        neg_log_lik = -np.take_along_axis(
-            pred, targets[:,:,0,:].astype(np.int32), axis=2
-        ).seqeeze(axis=2).flatten()
+        neg_log_lik = - np.take_along_axis(
+            pred, targets[:, :, 0, :].astype(np.int32), axis=2
+        ).squeeze(axis=2).flatten()
         neg_log_lik = neg_log_lik[valid_indices]
         
         if weights:
-            assert len(inputs) == len(weights), 'The length of valid states and weights should be the same'
+            assert len(inputs) == len(weights), 'The length of valid states and weights should be the same.'
             weights = np.array(weights).repeat(inputs.shape[1])
             weights = weights[valid_indices]
 
@@ -336,6 +334,7 @@ class avril:
         key = self.key
 
         lik_pre = 0
+        
         for itr in tqdm(range(iters)):
 
             if itr % num_batches == 0:

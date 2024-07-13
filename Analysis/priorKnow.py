@@ -50,7 +50,7 @@ def experienceModel(model_no_prior, dataPath, outputPath, start_date):
         # rewardValues = processAfterMigrationData(train_chain, stateAttribute, model, visitedState, id_coords, coords_fnid, actionDim, outputPath)
         plugInDataPair(iter_training_set, stateAttribute, model, visitedState)
         # Train the model. We get the model after the past of the date.
-        weights = [1 / 2 ** (memory_buffer - i) for i in range(memory_buffer)]
+        weights = [1 / 2 ** (memory_buffer + 1 - i) for i in range(memory_buffer + 1)]
         model.train(iters=1000, loss_threshold=0.01, weights=weights)
 
         # Save the current model state.
