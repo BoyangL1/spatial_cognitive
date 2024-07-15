@@ -209,12 +209,13 @@ def explainOneUser(user, parallel=False):
     
     if not parallel:
         shap_dict = dict()
-        for date in date_list:
+        # add reverse to mitigate the load balancing problem.
+        for date in reversed(date_list):
             shap_dict[date] = modelRewardExplain(date, who=user)
     else:
         # parallel version
         CPU_COUNT = len(date_list)
-        combination = [(date, user) for date in date_list]
+        combination = [(date, user) for date in reversed(date_list)]
         with mp.Pool(CPU_COUNT) as pool:
             shap_dict_values = pool.starmap(modelRewardExplain, combination)
         shap_dict = dict(zip(date_list, shap_dict_values))
@@ -263,13 +264,13 @@ if __name__ == '__main__':
     '''
     Half Parallel Version
     '''
-    # model_dir = './model/'
-    # user_list = [int(name) for name in os.listdir(model_dir) if name.isdigit()]
-    # user_list.sort()
-    # for user in user_list:
-    #     res = explainOneUser(user, parallel=False)
-    #     with open('./product/shap_res_{:08d}.pkl'.format(user), 'wb') as f:
-    #         pickle.dump(res, f)
+    model_dir = './model/'
+    user_list = [int(name) for name in os.listdir(model_dir) if name.isdigit()]
+    user_list.sort()
+    for user in user_list:
+        res = explainOneUser(user, parallel=True)
+        with open('./product/shap_res_{:09d}.pkl'.format(user), 'wb') as f:
+            pickle.dump(res, f)
     '''
     By Hand
     '''
@@ -278,20 +279,25 @@ if __name__ == '__main__':
     # user_list.sort()
 
     # user = user_list[0]
-    # res = explainOneUser(user, parallel=False)
+    # res = explainOneUser(user, parallel=True)
     # with open('./product/shap_res_{:98d}.pkl'.format(user), 'wb') as f:
     #     pickle.dump(res, f)
     '''
     Inspect the baseline.
     '''
-    model_dir = './model/'
-    user_list = [int(name) for name in os.listdir(model_dir) if name.isdigit()]
-    user_list.sort()
-    reward_dict = dict()
-    for user in user_list:
-        date_list = modelDateOfUser(user)
-        for date in date_list:
-            reward_dict[(user, date)] = modelRewardCalculation(date, who=user)
-            with open('./product/reward_res.pkl', 'wb') as f:
-                    pickle.dump(reward_dict, f)
-            
+    # model_dir = './model/'
+    # user_list = [int(name) for name in os.listdir(model_dir) if name.isdigit()]
+    # user_list.sort()
+    # reward_dict = dict()
+    # for user in user_list:
+    #     date_list = modelDateOfUser(user)
+    #     for date in date_list:
+    #         reward_dict[(user, date)] = modelRewardCalculation(date, who=user)
+    #         with open('./product/reward_res.pkl', 'wb') as f:
+    #                 pickle.dump(reward_dict, f)
+    '''
+    Test area
+    '''
+    # shap_dict = dict()
+    # date = 20230507
+    # shap_dict[date] = modelRewardExplain(date, who=1102234)

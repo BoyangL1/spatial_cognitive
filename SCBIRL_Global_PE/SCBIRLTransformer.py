@@ -314,8 +314,9 @@ class avril:
         inputs = self.inputs
         targets = self.targets
         pe_code = self.pe_code
-        weights = np.array(weights)
-
+        if weights is not None:
+            weights_array = np.array(weights)
+        
         init_fun, update_fun, get_params = optimizers.adam(l_rate)
         update_fun = jit(update_fun)
         get_params = jit(get_params)
@@ -345,8 +346,11 @@ class avril:
             indexs = indx_list_shuffle[indx : (batch_size + indx)]
 
             key, subkey = random.split(key)
+            
+            if weights is not None:
+                weights = weights_array[indexs]
 
-            lik, g_params = loss_grad(params, key, inputs[indexs], targets[indexs], pe_code[indexs], weights = weights[indexs])
+            lik, g_params = loss_grad(params, key, inputs[indexs], targets[indexs], pe_code[indexs], weights = weights)
 
             loss_diff = abs(lik-lik_pre)
             print(lik-lik_pre, lik)
