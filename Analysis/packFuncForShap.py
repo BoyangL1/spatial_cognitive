@@ -238,7 +238,7 @@ def explainAllRewards(parallel = False):
             shap_dict[(user, date)] = shap_dict_values[idx]
     return shap_dict
 
-def modelRewardCalculation(date: int, who: int = 36384703):
+def modelRewardCalculation(date: int, who: int):
     '''
         Give the SHAP value by grouping the type.
     '''
