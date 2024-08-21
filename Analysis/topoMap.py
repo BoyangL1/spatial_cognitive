@@ -28,7 +28,6 @@ import pickle
 import SCBIRL_Global_PE.SCBIRLTransformer as SIRLT
 import SCBIRL_Global_PE.migrationProcess as SIRLP
 import SCBIRL_Global_PE.utils as SIRLU
-from SCBIRL_Global_PE.utils import iter_start_date
 from TRAJ_PROCESS.prepareChain import Traveler
 
 from scipy.spatial import distance_matrix
@@ -178,6 +177,7 @@ def clusterLocations(who, date):
     data_dir = './data/' + 'user_data/' + who_string
     model_dir = './model/' + who_string
     save_dir = './product/' + who_string
+    iter_start_date = SIRLU.load_traveler(who).iter_start_date
 
     # Paths for data files
     full_trajectory_path = data_dir + 'all_traj.json'
@@ -270,17 +270,17 @@ if __name__ == '__main__':
     model_dir = "./model/"
     save_dir = "./product/topoMap/"
     user_list = [name for name in os.listdir(model_dir) if name.isdigit()]
-    user_list = user_list[0:1]
     for user in user_list:
         user_int = int(user)
         migrt_date = iter_start_date
         visit_dates = SIRLU.visited_date(user_int)
+        # note: 有可能找不到migrt_date, 后面需要修改。
         migrt_idx = visit_dates.index(migrt_date)
         start_idx = migrt_idx - 1
         recording_dates = visit_dates[start_idx::7]
         res_dict = dict()
         for date in recording_dates:
             res = clusterLocations(user_int, date)
-            res_dict[date] = res
-            with open(save_dir + f'topo_cluster_user1.pkl', 'wb') as f:
+            res_dict[(user, date)] = res
+            with open(save_dir + f'topo_cluster.pkl', 'wb') as f:
                 pickle.dump(res_dict, f)

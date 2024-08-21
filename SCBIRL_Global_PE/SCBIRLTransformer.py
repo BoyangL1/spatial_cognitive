@@ -160,7 +160,7 @@ class avril:
         q_values = np.squeeze(q_values,axis=2)
         return q_values
 
-    def elbo(self, params, key, inputs, targets, pe_code):
+    def elbo(self, params, key, inputs, targets, pe_code, weights = None):
         """
         Method for calculating ELBO
 
@@ -213,15 +213,6 @@ class avril:
         
         # calculate the kl difference between current reward and pre reward 
         means, log_sds, enc_output = getRewardParameters(e_params, 0)
-        if self.load_params:
-            # 有先验迭代
-            e_params_pre, _, _ = self.pre_params
-            means_pre, log_sds_pre , _ = getRewardParameters(e_params_pre, 0)
-            kl = kl_divergence(means, np.exp(log_sds), means_pre, np.exp(log_sds_pre)).mean()
-        else:
-            # 无先验迭代，标准正态分布
-            kl = klGaussianStandard(means, np.exp(log_sds) ** 2).mean()
-
         # calculate td error
         # calculate Q-values for current state
         q_values = self.q_network.apply(
@@ -265,26 +256,47 @@ class avril:
         td = q_values_a - q_values_next_a
         
         # Selecting unpadded value corresopnding to the real travel chain, delete nan value
-        valid_indices = ~np.isnan(td)
+        # valid_indices = ~np.isnan(td)
+        valid_multi_index = np.any(inputs[:, :, 0, :] != -999, axis=2)
+        valid_indices, = np.where(valid_multi_index.flatten())
         td = td[valid_indices]
         means = means[valid_indices]
         log_sds = log_sds[valid_indices]
 
+        if self.load_params:
+            # 有先验迭代
+            e_params_pre, _, _ = self.pre_params
+            means_pre, log_sds_pre , _ = getRewardParameters(e_params_pre, 0)
+            kl = kl_divergence(means, np.exp(log_sds), means_pre, np.exp(log_sds_pre))
+        else:
+            # 无先验迭代，标准正态分布
+            kl = klGaussianStandard(means, np.exp(log_sds) ** 2)
+        
         # Add a negative sign in front of each formula to solve for the minimum value
         # Calculate log-likelihood of TD error given reward parameterisation
         lambda_value = 1
-        irl_loss = -jax.scipy.stats.norm.logpdf(td, means, np.exp(log_sds)).mean()
+        irl_loss = -jax.scipy.stats.norm.logpdf(td, means, np.exp(log_sds))
 
         # Calculate log-likelihood of actions
         pred = jax.nn.log_softmax(q_values)
-        neg_log_lik = -np.take_along_axis(
-            pred, targets[:,:, 0, :].astype(np.int32), axis=1
-        )
-        neg_log_lik = np.nanmean(neg_log_lik)
+        neg_log_lik = - np.take_along_axis(
+            pred, targets[:, :, 0, :].astype(np.int32), axis=2
+        ).squeeze(axis=2).flatten()
+        neg_log_lik = neg_log_lik[valid_indices]
         
-        return neg_log_lik + kl + lambda_value*irl_loss
+        if weights is not None:
+            assert len(inputs) == len(weights), 'The length of valid states and weights should be the same.'
+            weights = weights.repeat(inputs.shape[1])
+            weights = weights[valid_indices]
+
+        neg_log_lik = np.average(neg_log_lik, weights=weights)
+        kl = np.average(kl, weights=weights)
+        irl_loss = np.average(irl_loss, weights=weights)
+
+        return neg_log_lik + kl + lambda_value * irl_loss
     
-    def train(self, iters: int = 1000, batch_size: int = 64, l_rate: float = 1e-4, loss_threshold: float = 0.01):
+    def train(self, iters: int = 1000, batch_size: int = 64, l_rate: float = 1e-2, 
+              loss_threshold: float = 0.01, weights = None):
         """
         Training function for the model.
 
@@ -301,7 +313,9 @@ class avril:
         inputs = self.inputs
         targets = self.targets
         pe_code = self.pe_code
-
+        if weights is not None:
+            weights_array = np.array(weights)
+        
         init_fun, update_fun, get_params = optimizers.adam(l_rate)
         update_fun = jit(update_fun)
         get_params = jit(get_params)
@@ -321,6 +335,7 @@ class avril:
         key = self.key
 
         lik_pre = 0
+        
         for itr in tqdm(range(iters)):
 
             if itr % num_batches == 0:
@@ -330,11 +345,14 @@ class avril:
             indexs = indx_list_shuffle[indx : (batch_size + indx)]
 
             key, subkey = random.split(key)
+            
+            if weights is not None:
+                weights = weights_array[indexs]
 
-            lik, g_params = loss_grad(params, key, inputs[indexs], targets[indexs], pe_code[indexs])
+            lik, g_params = loss_grad(params, key, inputs[indexs], targets[indexs], pe_code[indexs], weights = weights)
 
             loss_diff = abs(lik-lik_pre)
-            print(loss_diff,lik)
+            print(lik-lik_pre, lik)
             if loss_diff < loss_threshold:
                 print(f"Training stopped at iteration {itr} as loss {loss_diff} is below the threshold {loss_threshold}")
                 break

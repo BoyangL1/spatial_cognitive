@@ -11,7 +11,7 @@ import geopandas as gpd
 import json
 import pickle
 from collections import namedtuple
-from SCBIRL_Global_PE.utils import Traveler
+from SCBIRL_Global_PE.utils import Traveler, training_baseline_count
 
 def build_chain(group):
     lon = group.longitude.tolist()
@@ -92,8 +92,13 @@ def writing2DataFolder(data):
     all_feature = featureset2allFeature(data)
     coords_fnid_mapping, id_coords_mapping = createCoordsMapping(data)
     all_json = featureset2Json(data)
-    traveler = Traveler(who=who, visit_date=data['date'].unique().tolist())
-    
+    visited_date = data['date'].unique().tolist()
+    if len(visited_date) < 3 * training_baseline_count:
+        iter_start_date = visited_date[np.ceil(len(visited_date)/3).astype(int) - 1]
+    else:
+        iter_start_date = visited_date[training_baseline_count - 1]
+    traveler = Traveler(who=who, visit_date=visited_date, iter_start_date=iter_start_date)
+
     all_feature.to_csv(writing_path + 'all_traj_feature.csv',index=False)
     
     with open(writing_path + 'all_traj.json', 'w') as file:

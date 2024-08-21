@@ -269,7 +269,15 @@ def processAfterMigrationData(tc, stateAttribute, model, visitedState, id_coords
 
 
 
-def afterMigrt(model, dataPath, outputPath, start_date):
+def afterMigrt(model, dataPath, outputPath, start_date, iter_type):
+    assert iter_type in ['recent', 'prior'], "Argument `iter_type` should be either 'recent' or 'prior'."
+    if iter_type == 'recent':
+        model_tag = 'iterated'
+        folder_name = "evolution_model/"
+    else:
+        model_tag = 'increased'
+        folder_name = 'empirical_model/'
+    
     full_traj_path = dataPath + "all_traj.json"
 
     # Load the mapping between IDs and their corresponding fnid.
@@ -292,7 +300,7 @@ def afterMigrt(model, dataPath, outputPath, start_date):
         resultsDf = resultsDf._append({'coords': key, 'fnid': value}, ignore_index=True)
 
 
-    modelDir = outputPath + "evolution_model/"
+    modelDir = outputPath + folder_name
     if not os.path.exists(modelDir):
         os.makedirs(modelDir)
     memory_buffer = 10 # days
@@ -309,8 +317,10 @@ def afterMigrt(model, dataPath, outputPath, start_date):
         plugInDataPair(iter_training_set, stateAttribute, model, visitedState)
 
         # Train the model.
-        model.train(iters=1000,loss_threshold=0.01)
+        # weights = [1 / 2 ** (memory_buffer - i) for i in range(memory_buffer)]
+        weights = None
+        model.train(iters=1000,loss_threshold=0.01, weights=weights)
 
         # Save the current model state.
-        modelSavePath = modelDir + 'iterated_model_' + str(iter_training_set[-1].date) + ".pickle"
+        modelSavePath = modelDir + model_tag + '_model_' + str(iter_training_set[-1].date) + ".pickle"
         model.modelSave(modelSavePath)
