@@ -317,6 +317,7 @@ def afterMigrt(model, dataPath, outputPath, start_date, iter_type):
         plugInDataPair(iter_training_set, stateAttribute, model, visitedState)
 
         # Train the model.
+        # change
         # weights = [1 / 2 ** (memory_buffer - i) for i in range(memory_buffer)]
         weights = None
         model.train(iters=1000,loss_threshold=0.01, weights=weights)

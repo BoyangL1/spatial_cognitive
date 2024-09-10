@@ -295,7 +295,7 @@ class avril:
 
         return neg_log_lik + kl + lambda_value * irl_loss
     
-    def train(self, iters: int = 1000, batch_size: int = 64, l_rate: float = 1e-2, 
+    def train(self, iters: int = 1000, batch_size: int = 64, l_rate: float = 1e-4, 
               loss_threshold: float = 0.01, weights = None):
         """
         Training function for the model.

@@ -17,6 +17,7 @@ def train_model_one_traveler(who: int):
     # here the `iter_start_date` is a constant defined by utility module.
     inputs, targets_action, pe_code, action_dim, state_dim = SIRLU.loadTrajChain(data_dir, type='before', start_date=iter_start_date)
     print(inputs.shape, targets_action.shape, pe_code.shape)
+    # tabular rasa model
     model = SIRLT.avril(inputs, targets_action, pe_code, state_dim, action_dim, state_only=True)
 
     # model the model with no prior knowledge
