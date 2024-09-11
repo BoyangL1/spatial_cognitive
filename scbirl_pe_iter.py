@@ -44,8 +44,9 @@ if __name__ =="__main__":
     '''
         Parallel Version
     '''
-    # import multiprocessing as mp
+    import multiprocessing as mp
     
+<<<<<<< HEAD
     # MAX_CPU_COUNT = mp.cpu_count()
     # done_who = []
     # import os
@@ -55,8 +56,23 @@ if __name__ =="__main__":
     #     who_list.remove(who)
     # with mp.Pool(MAX_CPU_COUNT) as pool:
     #     pool.map(train_model_one_traveler, who_list)
+=======
+    MAX_CPU_COUNT = mp.cpu_count()
+    done_who = []
+    import os
+    file_list = os.listdir('./data/user_data/')
+    who_list = [int(pid) for pid in file_list]
+    for who in done_who:
+        who_list.remove(who)
+    with mp.Pool(MAX_CPU_COUNT) as pool:
+        pool.map(train_model_one_traveler, who_list)
+>>>>>>> 02384a6408c7426e23a6e1d8a002d1219c560d53
 
     '''
         Terminal Version
     '''
+<<<<<<< HEAD
     train_model_one_traveler(who = 1102234)
+=======
+    # train_model_one_traveler(who = 102181433)
+>>>>>>> 02384a6408c7426e23a6e1d8a002d1219c560d53

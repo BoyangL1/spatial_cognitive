@@ -184,6 +184,7 @@ def modelUserDateCombination():
     # list all users with folder name consisting of all digits.
     # note: change here
     user_list = [name for name in os.listdir(model_dir) if name.isdigit()]
+    user_list.remove('001102234')
     
     combination = []
     for user in user_list:
