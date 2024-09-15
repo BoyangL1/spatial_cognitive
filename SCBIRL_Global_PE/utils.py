@@ -13,6 +13,10 @@ TravelData = namedtuple('TravelChain', ['date', 'travel_chain','id_chain','fnid_
 Traveler = namedtuple('Traveler', ['who', 'visit_date', 'iter_start_date'])
 training_baseline_count = 50
 
+# UserDataPart = './data/user_data_survey/'
+# UserDataPart = './data/user_data_migrt/'
+UserDataPart = './data/user_data_test/'
+
 def loadJsonFile(file_path):
     with open(file_path, 'r') as file:
         return json.load(file)
@@ -244,7 +248,7 @@ def toWhoString(who: int, digits=9):
 
 def migrationDate(who: int = 36384703):
     # using the os path to get the after traj path
-    data_dir = './data/user_data/' + toWhoString(who) + '/'
+    data_dir = UserDataPart + toWhoString(who) + '/'
     after_traj_path = data_dir + 'after_migrt.json'
 
     after_traj = loadJsonFile(after_traj_path)
@@ -252,25 +256,25 @@ def migrationDate(who: int = 36384703):
     return migration_date
 
 def load_traveler(who: int):
-    with open(f'./data/user_data/{toWhoString(who)}/traveler_info.pkl', 'rb') as file:
+    with open(UserDataPart + f'{toWhoString(who)}/traveler_info.pkl', 'rb') as file:
         return pickle.load(file)
 
 def load_id_coords_mapping(who: int):
-    data_dir = f'./data/user_data/'
+    data_dir = UserDataPart
     id_coord_mapping_path = data_dir + toWhoString(who) + '/id_coords_mapping.pkl'
     with open(id_coord_mapping_path, "rb") as f:
         coords_id = pickle.load(f)
     return coords_id
 
 def load_fnid_coords_mapping(who: int):
-    data_dir = f'./data/user_data/'
+    data_dir = UserDataPart
     id_coord_mapping_path = data_dir + toWhoString(who) + '/coords_fnid_mapping.pkl'
     with open(id_coord_mapping_path, "rb") as f:
         coords_fnid = pickle.load(f)
     return coords_fnid
 
 def load_all_traj(who: int):
-    data_dir = f'./data/user_data/'
+    data_dir = UserDataPart
     all_traj_path = data_dir + toWhoString(who) + '/all_traj.json'
     with open(all_traj_path, 'r') as file:
         loaded_dicts_all = json.load(file)
@@ -278,7 +282,7 @@ def load_all_traj(who: int):
     return loaded_namedtuples_all
 
 def load_state_attrs(who: int):
-    data_dir = f'./data/user_data/'
+    data_dir = UserDataPart
     filename = 'all_traj_feature.csv'
     
     traj_path = data_dir + toWhoString(who) + '/' + filename

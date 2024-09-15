@@ -29,6 +29,7 @@ import SCBIRL_Global_PE.SCBIRLTransformer as SIRLT
 import SCBIRL_Global_PE.migrationProcess as SIRLP
 import SCBIRL_Global_PE.utils as SIRLU
 from TRAJ_PROCESS.prepareChain import Traveler
+from SCBIRL_Global_PE.utils import UserDataPath
 
 from scipy.spatial import distance_matrix
 # note: scipy wasserstein function is too slow.
@@ -133,7 +134,7 @@ def computeTransitionProb(model, who, date):
         
     state_attribute = SIRLU.load_state_attrs(who)
     
-    all_traj_src = './data/user_data/%s/all_traj.json' % (who_string,)
+    all_traj_src = UserDataPath + '%s/all_traj.json' % (who_string,)
     all_traj_dict = SIRLU.loadJsonFile(all_traj_src)
     chains_dict = filter(lambda x: x['date'] <= date, all_traj_dict)
 
@@ -174,7 +175,7 @@ def computeTransitionProb(model, who, date):
 
 def clusterLocations(who, date):
     who_string = SIRLU.toWhoString(who) + '/'
-    data_dir = './data/' + 'user_data/' + who_string
+    data_dir = UserDataPath + who_string
     model_dir = './model/' + who_string
     save_dir = './product/' + who_string
     iter_start_date = SIRLU.load_traveler(who).iter_start_date

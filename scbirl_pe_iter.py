@@ -4,13 +4,13 @@ import SCBIRL_Global_PE.SCBIRLTransformer as SIRLT
 import SCBIRL_Global_PE.utils as SIRLU
 import SCBIRL_Global_PE.migrationProcess as SIRLP
 import Analysis.priorKnow as PriorKnow
-from SCBIRL_Global_PE.utils import Traveler
+from SCBIRL_Global_PE.utils import Traveler, UserDataPart
 
 import jax
 jax.config.update('jax_platform_name', 'cpu')
 
 def train_model_one_traveler(who: int):
-    data_dir = './data/user_data/{:09d}/'.format(who)
+    data_dir = UserDataPart + '{:09d}/'.format(who)
     model_dir = './model/{:09d}/'.format(who)
     
     iter_start_date = SIRLU.load_traveler(who).iter_start_date
@@ -49,7 +49,7 @@ if __name__ =="__main__":
     # MAX_CPU_COUNT = mp.cpu_count()
     # done_who = []
     # import os
-    # file_list = os.listdir('./data/user_data/')
+    # file_list = os.listdir(UserDataPart)
     # who_list = [int(pid) for pid in file_list]
     # for who in done_who:
     #     who_list.remove(who)

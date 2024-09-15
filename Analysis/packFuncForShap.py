@@ -7,7 +7,7 @@ sys.path.append(working_directory)
 import SCBIRL_Global_PE.SCBIRLTransformer as SIRLT
 import SCBIRL_Global_PE.utils as SIRLU
 import SCBIRL_Global_PE.migrationProcess as SIRLM
-from SCBIRL_Global_PE.utils import TravelData, Traveler
+from SCBIRL_Global_PE.utils import TravelData, Traveler, UserDataPart
 
 import numpy as np
 import pandas as pd
@@ -32,7 +32,7 @@ def loadModel(who, date = None, prior = True, accumulate = False, tabular = Fals
         Load the model from the model directory.
         Must correctly set the directory at first.
     '''
-    data_dir = './data/user_data/' + SIRLU.toWhoString(who) + '/'
+    data_dir = UserDataPart + SIRLU.toWhoString(who) + '/'
     model_dir = './model/' + SIRLU.toWhoString(who) + '/'
     
     iter_start_date = SIRLU.load_traveler(who).iter_start_date
@@ -92,7 +92,7 @@ def backgroundData(who: int, date = None):
     # feature dataframe for query
     features_query = SIRLU.load_state_attrs(who)
     
-    data_dir = './data/user_data/' + SIRLU.toWhoString(who) + '/'
+    data_dir = UserDataPart + SIRLU.toWhoString(who) + '/'
     full_traj_path = data_dir + 'all_traj.json'
     chains_dict = SIRLU.loadJsonFile(full_traj_path)
     if date is not None:

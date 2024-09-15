@@ -11,7 +11,12 @@ import geopandas as gpd
 import json
 import pickle
 from collections import namedtuple
-from SCBIRL_Global_PE.utils import Traveler, training_baseline_count
+from SCBIRL_Global_PE.utils import Traveler, training_baseline_count, UserDataPart
+
+source_type_dict = {
+    './data/user_data_survey/': 'featureset.csv',
+    './data/user_data_migrt/': 'featureset2.csv',
+}
 
 def build_chain(group):
     lon = group.longitude.tolist()
@@ -57,6 +62,7 @@ def featureset2Json(data):
 
 def featureset2allFeature(data):
     columns = data.columns[data.columns.str.startswith("LU_")].tolist()
+    columns.extend(['subway', 'density', 'intersections', 'road_density', 'rent'])
     columns.insert(0, 'fnid')
     res = data[columns].drop_duplicates(subset = 'fnid')
     return res.reset_index(drop = True)
@@ -84,7 +90,7 @@ def createCoordsMapping(data):
 
 def writing2DataFolder(data):
     who = data.who.tolist()[0]
-    output_path = './data/user_data/'
+    output_path = UserDataPart
     writing_path = output_path + f'{who:09d}/'
     
     os.makedirs(writing_path, exist_ok=True)
@@ -102,7 +108,7 @@ def writing2DataFolder(data):
     all_feature.to_csv(writing_path + 'all_traj_feature.csv',index=False)
     
     with open(writing_path + 'all_traj.json', 'w') as file:
-        json.dump(all_json, file, indent=4, default=int64_converter)    
+        json.dump(all_json, file, indent=4, default=int64_converter)     
     with open(writing_path + "coords_fnid_mapping.pkl", "wb") as f:
         pickle.dump(coords_fnid_mapping, f)
     with open(writing_path + "id_coords_mapping.pkl", "wb") as f:
@@ -115,7 +121,7 @@ def writing2DataFolder(data):
 if __name__ == '__main__':
     read_path = './data/'
     
-    df = pd.read_csv(read_path + 'featureset.csv')
+    df = pd.read_csv(read_path + source_type_dict[UserDataPart])
     df_lists = [df for name, df in df.groupby('who')]
     
     for i in range(len(df_lists)):
