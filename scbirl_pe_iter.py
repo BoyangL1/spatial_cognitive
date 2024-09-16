@@ -46,17 +46,17 @@ if __name__ =="__main__":
     '''
     import multiprocessing as mp
     
-    # MAX_CPU_COUNT = mp.cpu_count()
-    # done_who = []
-    # import os
-    # file_list = os.listdir(UserDataPart)
-    # who_list = [int(pid) for pid in file_list]
-    # for who in done_who:
-    #     who_list.remove(who)
-    # with mp.Pool(MAX_CPU_COUNT) as pool:
-    #     pool.map(train_model_one_traveler, who_list)
+    MAX_CPU_COUNT = mp.cpu_count() - 2
+    done_who = []
+    import os
+    file_list = os.listdir(UserDataPart)
+    who_list = [int(pid) for pid in file_list]
+    for who in done_who:
+        who_list.remove(who)
+    with mp.Pool(MAX_CPU_COUNT) as pool:
+        pool.map(train_model_one_traveler, who_list)
 
     '''
         Terminal Version
     '''
-    train_model_one_traveler(who = 1102234)
+    # train_model_one_traveler(who = 1102234)
