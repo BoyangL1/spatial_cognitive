@@ -269,7 +269,7 @@ if __name__ == "__main__":
     '''
     import multiprocessing as mp
     CPU_COUNT = len(wholist)
-    CPU_COUNT = 16
+    # CPU_COUNT = 16
     with mp.Pool(CPU_COUNT) as pool:
         iterDfs = pool.map(personInterpretEvaluation, wholist)
 

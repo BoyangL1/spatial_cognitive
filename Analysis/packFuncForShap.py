@@ -26,7 +26,6 @@ jax.config.update('jax_platform_name', 'cpu')
 MAX_CPU_COUNT = mp.cpu_count() - 1
 # MAX_CPU_COUNT = 48
 
- 
 def loadModel(who, date = None, prior = True, accumulate = False, tabular = False):
     '''
         Load the model from the model directory.
@@ -55,8 +54,8 @@ def loadModel(who, date = None, prior = True, accumulate = False, tabular = Fals
     model.loadParams(path)
     return model
 
-def modelPredict(X: np.ndarray[float, float], weight: np.ndarray[int] = None, 
-                 model = None, standardize = False, attribute_type = 'reward'):
+def modelPredict(X: np.ndarray[float, float], model = None, standardize = False,
+                 attribute_type = 'reward', mu = None, sigma = None):
     '''
         load the matrix of features, return the reward predicted by the model
     '''
@@ -89,11 +88,6 @@ def modelPredict(X: np.ndarray[float, float], weight: np.ndarray[int] = None,
     
     y_pred = np.array(y_pred)
     if standardize:
-        if weight is None:
-            weight = np.ones(y_pred.shape[0])
-        assert y_pred.shape[0] == weight.shape[0], "The weight must have the same length as the prediction."
-        mu = np.average(y_pred, weights=weight)
-        sigma = np.sqrt(np.average((y_pred - mu) ** 2, weights=weight))
         y_pred = (y_pred - mu) / sigma
     return y_pred
 
@@ -171,9 +165,13 @@ def modelRewardExplain(date: int, who: int):
     # zero_bench = np.zeros(dataset.shape[1]).reshape(1, -1)
     home_bench = np.hstack((built_bench, locat_bench))
 
+    reward_vector = modelPredict(X=dataset_uni, model=model, attribute_type='reward')
+    mu = np.average(reward_vector, weights=dataset_freq)
+    sigma = np.sqrt(np.average((reward_vector - mu) ** 2, weights=dataset_freq))
+
     def modelPredWrapper(X):
-        return modelPredict(X, weight = dataset_freq, model=model, standardize=True,
-                            attribute_type='reward')
+        return modelPredict(X, model=model, standardize=True,
+                            attribute_type='reward', mu=mu, sigma=sigma)
     
     # modelPredWrapper = partial(modelPredict, weight=dataset_freq, model=model, standardize=True, attribute_type='reward')
     explainer = shap.PermutationExplainer(modelPredWrapper, home_bench)
@@ -285,7 +283,7 @@ if __name__ == '__main__':
     user_list.sort()
     for user in user_list:
         # note: remember to change back
-        res = explainOneUser(user, parallel=False)
+        res = explainOneUser(user, parallel=True)
         with open('./product/shap_res_{:09d}.pkl'.format(user), 'wb') as f:
             pickle.dump(res, f)
     '''
