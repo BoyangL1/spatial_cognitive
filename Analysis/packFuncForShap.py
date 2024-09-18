@@ -23,10 +23,9 @@ import jax
 jax.config.update('jax_platform_name', 'cpu')
 
 # count the cpu number
-# MAX_CPU_COUNT = mp.cpu_count() - 1
-MAX_CPU_COUNT = 48
+MAX_CPU_COUNT = mp.cpu_count() - 1
+# MAX_CPU_COUNT = 48
 
- 
 def loadModel(who, date = None, prior = True, accumulate = False, tabular = False):
     '''
         Load the model from the model directory.
@@ -55,14 +54,15 @@ def loadModel(who, date = None, prior = True, accumulate = False, tabular = Fals
     model.loadParams(path)
     return model
 
-def modelPredict(X: np.array, model = None, attribute_type = 'reward'):
+def modelPredict(X: np.ndarray[float, float], model = None, standardize = False,
+                 attribute_type = 'reward', mu = None, sigma = None):
     '''
         load the matrix of features, return the reward predicted by the model
     '''
-    # ! change here
+
     if model is None:
-        model = loadModel()
-    # model = loadModel()
+        raise ValueError("The model must be provided.")
+
     feature_num = model.s_dim
     assert X.shape[1] == 7 * feature_num, "The input matrix does not have the correct number of features."
     state = X[:, :feature_num]
@@ -83,9 +83,12 @@ def modelPredict(X: np.array, model = None, attribute_type = 'reward'):
         state_current = np.take(state, indices=row, axis=-2)
         pecode_current = np.take(pecode, indices=row, axis=-2)
         res_val = predict_function(state_current, pecode_current)
+        # note browser
         y_pred.append(res_val)
     
     y_pred = np.array(y_pred)
+    if standardize:
+        y_pred = (y_pred - mu) / sigma
     return y_pred
 
 def backgroundData(who: int, date = None):
@@ -100,7 +103,7 @@ def backgroundData(who: int, date = None):
     all_chains = SIRLU.loadTravelDataFromDicts(chains_dict)
 
     total_array_list = []
-    # unstack the visits
+    # unstack the visits: for chain on each day...
     for chain in all_chains:
         feature_array = []
         for fnid in chain.fnid_chain:
@@ -152,7 +155,6 @@ def modelRewardExplain(date: int, who: int):
     
     print('Explaining person: {who:9d}, date: {date}'.format(who=who, date=date))
     model = loadModel(who=who, date=date)
-    modelPredWrapper = partial(modelPredict, model=model, attribute_type='reward')
 
     dataset = backgroundData(who=who, date=date)
     dataset_uni, dataset_freq = sparseBackground(dataset)
@@ -163,11 +165,20 @@ def modelRewardExplain(date: int, who: int):
     # zero_bench = np.zeros(dataset.shape[1]).reshape(1, -1)
     home_bench = np.hstack((built_bench, locat_bench))
 
+    reward_vector = modelPredict(X=dataset_uni, model=model, attribute_type='reward')
+    mu = np.average(reward_vector, weights=dataset_freq)
+    sigma = np.sqrt(np.average((reward_vector - mu) ** 2, weights=dataset_freq))
+
+    def modelPredWrapper(X):
+        return modelPredict(X, model=model, standardize=True,
+                            attribute_type='reward', mu=mu, sigma=sigma)
+    
+    # modelPredWrapper = partial(modelPredict, weight=dataset_freq, model=model, standardize=True, attribute_type='reward')
     explainer = shap.PermutationExplainer(modelPredWrapper, home_bench)
     shap_values = explainer(dataset_uni)
     
     # below: group the shape var names
-    varchr = 'LU_Business,LU_City_Road,LU_Consumption,LU_Culture,LU_Industry,LU_Medical,LU_Park_&_Scenery,LU_Public,LU_Residence,LU_Science_&_Education,LU_Special,LU_Transportation,LU_Wild'
+    varchr = 'LU_Business,LU_Green,LU_Industry,LU_Public,LU_Residence,subway,density,intersections,road_density,rent'
     varname_BE = varchr.split(',')
     varname_PE = ['PE%02d' % i for i in range(6 * len(varname_BE))]
     varname = varname_BE + varname_PE
@@ -184,7 +195,6 @@ def modelUserDateCombination():
     # list all users with folder name consisting of all digits.
     # note: change here
     user_list = [name for name in os.listdir(model_dir) if name.isdigit()]
-    user_list.remove('001102234')
     
     combination = []
     for user in user_list:
@@ -244,10 +254,14 @@ def modelRewardCalculation(date: int, who: int):
     '''
     print('Explaining person: {who:8d}, date: {date}'.format(who=who, date=date))
     model = loadModel(who=who, date=date)
-    modelPredWrapper = partial(modelPredict, model=model, attribute_type='reward')
+    # modelPredWrapper = partial(modelPredict, model=model, attribute_type='reward')
 
     dataset = backgroundData(who=who, date = date)
     dataset_uni, dataset_freq = sparseBackground(dataset)
+    
+    # modelPredWrapper = partial(modelPredict, model=model, attribute_type='reward')
+    modelPredWrapper = partial(modelPredict, model=model, standardize=False, attribute_type='reward')
+
     reward_comp = modelPredWrapper(dataset_uni)
     res = np.average(np.abs(reward_comp), weights=dataset_freq)
     return res
@@ -268,7 +282,8 @@ if __name__ == '__main__':
     user_list = [int(name) for name in os.listdir(model_dir) if name.isdigit()]
     user_list.sort()
     for user in user_list:
-        res = explainOneUser(user, parallel=False)
+        # note: remember to change back
+        res = explainOneUser(user, parallel=True)
         with open('./product/shap_res_{:09d}.pkl'.format(user), 'wb') as f:
             pickle.dump(res, f)
     '''
