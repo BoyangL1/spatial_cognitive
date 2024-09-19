@@ -148,7 +148,7 @@ def sparseBackground(dataset: np.array):
     return background_uni, background_weight
     
 
-def modelRewardExplain(date: int, who: int):
+def modelRewardExplain(date: int, who: int, binary_be_vs_loc = True):
     '''
         Give the SHAP value by grouping the type.
     '''
@@ -182,11 +182,14 @@ def modelRewardExplain(date: int, who: int):
     varname_BE = varchr.split(',')
     varname_PE = ['PE%02d' % i for i in range(6 * len(varname_BE))]
     varname = varname_BE + varname_PE
-    groupmap = {
-        'BuiltAttr': varname[:len(varname_BE)],
-        'Location': varname[len(varname_BE):]
-    }
-
+    if binary_be_vs_loc:
+        groupmap = {
+            'BuiltAttr': varname[:len(varname_BE)],
+            'Location': varname[len(varname_BE):]
+        }
+    else:
+        groupmap = {v: v for v in varname_BE}
+        groupmap['Location'] = varname_PE
     shap_grouped_by_classes = grouped_shap(shap_vals=shap_values.values, features=varname, groups=groupmap)
     return shap_grouped_by_classes, dataset_freq
 
@@ -214,41 +217,41 @@ def modelDateOfUser(user):
     date_list = date_list[::7]
     return date_list
 
-def explainOneUser(user, parallel=False):
+def explainOneUser(user, parallel=False, binary_be_vs_loc=True):
     date_list = modelDateOfUser(user)
     
     if not parallel:
         shap_dict = dict()
         # add reverse to mitigate the load balancing problem.
         for date in reversed(date_list):
-            shap_dict[date] = modelRewardExplain(date, who=user)
+            shap_dict[date] = modelRewardExplain(date, who=user, binary_be_vs_loc=binary_be_vs_loc)
     else:
         # parallel version
         CPU_COUNT = len(date_list)
-        combination = [(date, user) for date in reversed(date_list)]
+        combination = [(date, user, binary_be_vs_loc) for date in reversed(date_list)]
         with mp.Pool(CPU_COUNT) as pool:
             shap_dict_values = pool.starmap(modelRewardExplain, combination)
         shap_dict = dict(zip(date_list, shap_dict_values))
     return shap_dict
 
 
-def explainAllRewards(parallel = False):
+def explainAllRewards(parallel = False, binary_be_vs_loc=True):
     combination = modelUserDateCombination()
     shap_dict = dict()
     
     if not parallel:
         for user, date in combination:
-            shap_dict[(user, date)] = modelRewardExplain(date, who=user)
+            shap_dict[(user, date)] = modelRewardExplain(date, who=user, binary_be_vs_loc=binary_be_vs_loc)
     else:
         # parallel version
-        combination_switch = [(date, user) for user, date in combination]
+        combination_switch = [(date, user, binary_be_vs_loc) for user, date in combination]
         with mp.Pool(MAX_CPU_COUNT) as pool:
             shap_dict_values = pool.starmap(modelRewardExplain, combination_switch)
         for idx, (user, date) in enumerate(combination):
             shap_dict[(user, date)] = shap_dict_values[idx]
     return shap_dict
 
-def modelRewardCalculation(date: int, who: int):
+def modelRewardBaselineCalculation(date: int, who: int):
     '''
         Give the SHAP value by grouping the type.
     '''
@@ -259,10 +262,18 @@ def modelRewardCalculation(date: int, who: int):
     dataset = backgroundData(who=who, date = date)
     dataset_uni, dataset_freq = sparseBackground(dataset)
     
-    # modelPredWrapper = partial(modelPredict, model=model, attribute_type='reward')
-    modelPredWrapper = partial(modelPredict, model=model, standardize=False, attribute_type='reward')
+    reward_vector = modelPredict(X=dataset_uni, model=model, attribute_type='reward')
+    mu = np.average(reward_vector, weights=dataset_freq)
+    sigma = np.sqrt(np.average((reward_vector - mu) ** 2, weights=dataset_freq))
+
+    modelPredWrapper = partial(modelPredict, model=model, standardize=True, attribute_type='reward',
+                               mu=mu, sigma=sigma)
 
     reward_comp = modelPredWrapper(dataset_uni)
+    # test for the standardization validity
+    average_reward = np.average(reward_comp, weights=dataset_freq)
+    print('The average reward is: {reward}'.format(reward=average_reward))
+    
     res = np.average(np.abs(reward_comp), weights=dataset_freq)
     return res
 
@@ -278,14 +289,14 @@ if __name__ == '__main__':
     '''
     Half Parallel Version
     '''
-    model_dir = './model/'
-    user_list = [int(name) for name in os.listdir(model_dir) if name.isdigit()]
-    user_list.sort()
-    for user in user_list:
-        # note: remember to change back
-        res = explainOneUser(user, parallel=True)
-        with open('./product/shap_res_{:09d}.pkl'.format(user), 'wb') as f:
-            pickle.dump(res, f)
+    # model_dir = './model/'
+    # user_list = [int(name) for name in os.listdir(model_dir) if name.isdigit()]
+    # user_list.sort()
+    # for user in user_list:
+    #     # note: remember to change back
+    #     res = explainOneUser(user, parallel=True)
+    #     with open('./product/shap_res_{:09d}.pkl'.format(user), 'wb') as f:
+    #         pickle.dump(res, f)
     '''
     By Hand
     '''
@@ -300,16 +311,16 @@ if __name__ == '__main__':
     '''
     Inspect the baseline.
     '''
-    # model_dir = './model/'
-    # user_list = [int(name) for name in os.listdir(model_dir) if name.isdigit()]
-    # user_list.sort()
-    # reward_dict = dict()
-    # for user in user_list:
-    #     date_list = modelDateOfUser(user)
-    #     for date in date_list:
-    #         reward_dict[(user, date)] = modelRewardCalculation(date, who=user)
-    #         with open('./product/reward_res.pkl', 'wb') as f:
-    #                 pickle.dump(reward_dict, f)
+    model_dir = './model/'
+    user_list = [int(name) for name in os.listdir(model_dir) if name.isdigit()]
+    user_list.sort()
+    reward_dict = dict()
+    for user in user_list:
+        date_list = modelDateOfUser(user)
+        for date in date_list:
+            reward_dict[(user, date)] = modelRewardBaselineCalculation(date, who=user)
+            with open('./product/reward_res.pkl', 'wb') as f:
+                    pickle.dump(reward_dict, f)
     '''
     Test area
     '''

@@ -29,11 +29,11 @@ import SCBIRL_Global_PE.SCBIRLTransformer as SIRLT
 import SCBIRL_Global_PE.migrationProcess as SIRLP
 import SCBIRL_Global_PE.utils as SIRLU
 from TRAJ_PROCESS.prepareChain import Traveler
-from SCBIRL_Global_PE.utils import UserDataPath
+from SCBIRL_Global_PE.utils import UserDataPart
 
 from scipy.spatial import distance_matrix
 # note: scipy wasserstein function is too slow.
-# from scipy.stats import wasserstein_distance_nd, lognorm
+from scipy.stats import wasserstein_distance_nd, lognorm
 from scipy.stats import lognorm
 import ot
 import jax
@@ -134,7 +134,7 @@ def computeTransitionProb(model, who, date):
         
     state_attribute = SIRLU.load_state_attrs(who)
     
-    all_traj_src = UserDataPath + '%s/all_traj.json' % (who_string,)
+    all_traj_src = UserDataPart + '%s/all_traj.json' % (who_string,)
     all_traj_dict = SIRLU.loadJsonFile(all_traj_src)
     chains_dict = filter(lambda x: x['date'] <= date, all_traj_dict)
 
@@ -175,7 +175,7 @@ def computeTransitionProb(model, who, date):
 
 def clusterLocations(who, date):
     who_string = SIRLU.toWhoString(who) + '/'
-    data_dir = UserDataPath + who_string
+    data_dir = UserDataPart + who_string
     model_dir = './model/' + who_string
     save_dir = './product/' + who_string
     iter_start_date = SIRLU.load_traveler(who).iter_start_date
@@ -271,15 +271,15 @@ if __name__ == '__main__':
     model_dir = "./model/"
     save_dir = "./product/topoMap/"
     user_list = [name for name in os.listdir(model_dir) if name.isdigit()]
+    res_dict = dict()
     for user in user_list:
         user_int = int(user)
-        migrt_date = iter_start_date
+        migrt_date = SIRLU.load_traveler(user_int).iter_start_date
         visit_dates = SIRLU.visited_date(user_int)
         # note: 有可能找不到migrt_date, 后面需要修改。
         migrt_idx = visit_dates.index(migrt_date)
         start_idx = migrt_idx - 1
         recording_dates = visit_dates[start_idx::7]
-        res_dict = dict()
         for date in recording_dates:
             res = clusterLocations(user_int, date)
             res_dict[(user, date)] = res
