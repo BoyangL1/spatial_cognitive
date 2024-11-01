@@ -183,7 +183,7 @@ class avril:
             Value of the ELBO
         """
 
-        def getRewardParameters(encoder_params,state_dim):
+        def getRewardParameters(encoder_params, state_dim):
             # here, state_dim is eihter 0 or 1
             # the newaxis is to set the dimension same as before.
             r_par0 = self.encoder.apply(
@@ -205,8 +205,8 @@ class avril:
                 log_sds = r_par[:,:, 1].reshape(-1)  # log std var vector
             else:
                 means = np.take_along_axis(r_par, (targets[:,:, 0, :]).astype(int), axis=1).reshape((len(inputs),))
-                log_sds = np.take_along_axis(r_par, (a_dim + targets[:,:, 0, :]).astype(int), axis=1).reshape((len(inputs),))
-            return means, log_sds,r_par0
+                log_sds = np.take_along_axis(r_par, (self.a_dim + targets[:,:, 0, :]).astype(int), axis=1).reshape((len(inputs),))
+            return means, log_sds, r_par0
         
         # get neural network's parameters
         e_params, q_params, _ = params
@@ -250,14 +250,14 @@ class avril:
         )
         q_values_next = np.squeeze(q_values_next,axis=2)
         q_values_next_a = np.take_along_axis(
-            q_values, targets[:,:, 1, :].astype(np.int32), axis=2
+            q_values_next, targets[:,:, 1, :].astype(np.int32), axis=2
         ).reshape(inputs.shape[0]*inputs.shape[1])
         # calculate TD error
         td = q_values_a - q_values_next_a
         
         # Selecting unpadded value corresopnding to the real travel chain, delete nan value
         # valid_indices = ~np.isnan(td)
-        valid_multi_index = np.any(inputs[:, :, 0, :] != -999, axis=2)
+        valid_multi_index = np.any(inputs[:, :, 0, :] != Padding, axis=2)
         valid_indices, = np.where(valid_multi_index.flatten())
         td = td[valid_indices]
         means = means[valid_indices]

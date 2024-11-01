@@ -17,11 +17,17 @@ training_baseline_count = 50
 # UserDataPart = './data/user_data_migrt/'
 UserDataPart = './data/user_data_test/'
 
+Padding = -999
+
 def loadJsonFile(file_path):
     with open(file_path, 'r') as file:
         return json.load(file)
 
-def loadTravelDataFromDicts(data_dicts): # data_dicts: list[dict]
+def loadTravelDataFromDicts(data_dicts):
+    '''
+    params: data_dicts: list[dict]
+    return: list[TravelData]
+    '''
     return [TravelData(**d) for d in data_dicts]
 
 def getStateRow(state_attribute, state):
@@ -57,7 +63,7 @@ def preprocessStateAttributes(all_feature_path):
     # Return the combined DataFrame and the dimension of state attributes
     return pd.concat([fnid_col, scaled_df], axis=1), s_dim
 
-def padSequences(data_list, element_shape, padding_value=-999):
+def padSequences(data_list, element_shape, padding_value=Padding):
     """
     Pad lists of variable lengths containing elements of a specific shape.
 
@@ -190,20 +196,31 @@ def processSingleTrajectory(tc, t, state_attribute, s_dim):
         this_fnid, next_fnid = tc.fnid_chain[t], None
         s_n_s = onp.zeros((2, s_dim))
         s_n_s[0, :] = getStateRow(state_attribute, this_fnid)
+        # the latter position is filled with padding value
+        s_n_s[1, :] = Padding
 
         # get grid code of state and destination,dim(8,128,128)
         this_pe = globalPE(this_state,s_dim)
-        next_pe = onp.zeros_like(this_pe)
+        # next_pe = onp.zeros_like(this_pe)
         # save to s_grid_s
         s_pe_s = onp.empty((2, s_dim*3), dtype=onp.complex_)
         s_pe_s[0, :] = this_pe.flatten()
-        s_pe_s[1, :] = next_pe.flatten()
-
+        # s_pe_s[1, :] = next_pe.flatten()
+        s_pe_s[1, :] = Padding
+        
         a_n_a = onp.zeros((2, 1))
         a_n_a[0] = -1
         a_n_a[1] = -1
 
     return s_n_s, a_n_a, s_pe_s
+
+
+def loadTravelChainAll(who: int):
+    full_traj_path = UserDataPart + toWhoString(who) + '/all_traj.json'
+    all_trajs = loadJsonFile(full_traj_path)
+    chains_loaded = loadTravelDataFromDicts(all_trajs)
+    return chains_loaded
+
 
 def loadTrajChain(user_path, type: str, start_date=None):
     if type not in {'before', 'after', 'all'}:
@@ -246,14 +263,14 @@ def toWhoString(who: int, digits=9):
     return '{:0{digits}d}'.format(who, digits=digits)
 
 
-def migrationDate(who: int = 36384703):
-    # using the os path to get the after traj path
-    data_dir = UserDataPart + toWhoString(who) + '/'
-    after_traj_path = data_dir + 'after_migrt.json'
+# def migrationDate(who: int = 36384703):
+#     # using the os path to get the after traj path
+#     data_dir = UserDataPart + toWhoString(who) + '/'
+#     after_traj_path = data_dir + 'after_migrt.json'
 
-    after_traj = loadJsonFile(after_traj_path)
-    migration_date = after_traj[0]['date']
-    return migration_date
+#     after_traj = loadJsonFile(after_traj_path)
+#     migration_date = after_traj[0]['date']
+#     return migration_date
 
 def load_traveler(who: int):
     with open(UserDataPart + f'{toWhoString(who)}/traveler_info.pkl', 'rb') as file:
@@ -292,6 +309,17 @@ def load_state_attrs(who: int):
 def visited_date(who: int):
     traveler = load_traveler(who)
     return traveler.visit_date
+
+# copied from DeepMaxEntIRL
+def normalize(vals):
+    """
+    normalize to (0, max_val)
+    input:
+      vals: 1d array
+    """
+    min_val = np.min(vals)
+    max_val = np.max(vals)
+    return (vals - min_val) / (max_val - min_val)
 
 if __name__ == "__main__":
     path = f'./data/before_migrt.json'

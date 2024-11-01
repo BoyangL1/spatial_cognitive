@@ -27,7 +27,7 @@ def compress_pe_code_complex(pe_code, target_dim):
 
 def encoder_model(inputs, pe_code, num_layers, num_heads, dff, rate, output_dim, rng):
     # Combine inputs and pe code
-    pe_real_code,pe_imag_code = compress_pe_code_complex(pe_code, inputs.shape[-1])
+    pe_real_code, pe_imag_code = compress_pe_code_complex(pe_code, inputs.shape[-1])
     inputs = inputs + pe_real_code + pe_imag_code
 
     # Initialize transformer layer

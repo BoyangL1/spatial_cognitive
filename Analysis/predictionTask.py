@@ -9,7 +9,7 @@ import SCBIRL_Global_PE.SCBIRLTransformer as SIRLT
 import SCBIRL_Global_PE.utils as SIRLU
 from SCBIRL_Global_PE.migrationProcess import *
 import packFuncForShap as pack4shap
-from SCBIRL_Global_PE.utils import TravelData, Traveler
+from SCBIRL_Global_PE.utils import TravelData, Traveler, Padding
 from geopy.distance import geodesic
 import pickle
 
@@ -22,7 +22,7 @@ def trajectoryCompute(model, tcs: list[TravelData], state_attribute: pd.DataFram
     stateNextState, _, peNextpe = processTrajectoryData(tcs, state_attribute, model.s_dim)
     states = stateNextState[:, :, 0, np.newaxis, :] # [num_traj, max_steps, 1, state_dim]
     pe_codes = peNextpe[:, :, 0, np.newaxis, :] # [num_traj, max_steps, 1, pecode_dim]
-    pad_mask = np.where(states == -999, True, False).all(axis = (-1, -2))
+    pad_mask = np.where(states == Padding, True, False).all(axis = (-1, -2))
     pad_mask_reverse = ~pad_mask
     selection_mask = np.where(pad_mask_reverse)
 
@@ -193,7 +193,7 @@ def stepwise_kl_div_compute(df_1: pd.DataFrame, df_2: pd.DataFrame):
     return kl_series.mean()
 
 
-def personInterpretEvaluation(who: int):
+def personInterpretEvaluation(who: int, period: str = 'future'):
     traveler = load_traveler(who)
     migrtdate = SIRLU.load_traveler(who).iter_start_date
 
@@ -210,16 +210,24 @@ def personInterpretEvaluation(who: int):
     for one_evolution_date in evoludate:
         # find the position of the evolution date
         evolution_pos = evoludate.index(one_evolution_date)
-        # if the buffer range is out of range, break the loop
-        if evolution_pos + evolution_buffer > len(evoludate):
-            break
         print("The evolution date is: ", one_evolution_date)
-        
-        # create the date range for evaluation
-        evolution_date_range = evoludate[evolution_pos : evolution_pos + evolution_buffer]
-        # know the start and end date for evaluation func
-        start_date = evolution_date_range[0]
-        end_date = evolution_date_range[-1]
+        # 根据period参数选择时间段范围
+        if period == 'future':
+            # 'future' period configuration
+            # if the buffer range is out of range, break the loop
+            if evolution_pos + evolution_buffer > len(evoludate):
+                break
+            # create the date range for evaluation
+            evolution_date_range = evoludate[evolution_pos: evolution_pos + evolution_buffer]
+            # know the start and end date for evaluation func
+            start_date = evolution_date_range[0]
+            end_date = evolution_date_range[-1]
+        elif period == 'total':
+            # 'total' period configuration
+            start_date = evoludate[0]
+            end_date = evoludate[-1]
+        else:
+            raise ValueError("Invalid period argument. Use 'future' or 'total'.")
         
         prior_model = pack4shap.loadModel(who=who, )
         if evolution_pos < 10:
@@ -259,11 +267,14 @@ def personInterpretEvaluation(who: int):
                               })
     return result_df
 
+
+
 if __name__ == "__main__":
 
     
     wholist = [int(f) for f in os.listdir('./model/') if f.isdigit()]
     wholist.sort()
+    params_list = [(who, 'total') for who in wholist]
     '''
     Parallel Verison
     '''
@@ -271,9 +282,9 @@ if __name__ == "__main__":
     CPU_COUNT = len(wholist)
     # CPU_COUNT = 16
     with mp.Pool(CPU_COUNT) as pool:
-        iterDfs = pool.map(personInterpretEvaluation, wholist)
+        iterDfs = pool.starmap(personInterpretEvaluation, params_list)
 
-    with open('./product/iterationEvo.pkl', 'wb') as file:
+    with open('./product/iterationEvo_TOTAL.pkl', 'wb') as file:
         pickle.dump(iterDfs, file)
     
     '''
