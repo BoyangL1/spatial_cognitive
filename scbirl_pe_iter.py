@@ -5,7 +5,7 @@ import SCBIRL_Global_PE.utils as SIRLU
 import SCBIRL_Global_PE.migrationProcess as SIRLP
 import Analysis.priorKnow as PriorKnow
 from SCBIRL_Global_PE.utils import Traveler, UserDataPart
-from Analysis.comparison_models import avril_without_pe
+# from Analysis.comparison_models import avril_without_pe
 
 import jax
 jax.config.update('jax_platform_name', 'cpu')
@@ -19,8 +19,8 @@ def train_model_one_traveler(who: int):
     inputs, targets_action, pe_code, action_dim, state_dim = SIRLU.loadTrajChain(data_dir, type='before', start_date=iter_start_date)
     print(inputs.shape, targets_action.shape, pe_code.shape)
     # tabular rasa model
-    # model = SIRLT.avril(inputs, targets_action, pe_code, state_dim, action_dim, state_only=True)
-    model = avril_without_pe(inputs, targets_action,  state_dim, action_dim, state_only=True)
+    model = SIRLT.avril(inputs, targets_action, pe_code, state_dim, action_dim, state_only=True)
+    # model = avril_without_pe(inputs, targets_action,  state_dim, action_dim, state_only=True)
 
     # model the model with no prior knowledge
     PriorKnow.experienceModel(model, data_dir, model_dir, start_date = iter_start_date)

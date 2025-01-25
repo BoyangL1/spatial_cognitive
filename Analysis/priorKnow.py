@@ -12,6 +12,10 @@ from SCBIRL_Global_PE.migrationProcess import *
 from SCBIRL_Global_PE.utils import plugInDataPair
 
 def experienceModel(model_no_prior, dataPath, outputPath, start_date):
+    # todo: move to migrationProcess
+    '''
+    Train experience model from model without prior knowledge.
+    '''
     full_traj_path = dataPath + "all_traj.json"
     
     # Load the mapping between IDs and their corresponding fnid.
@@ -47,7 +51,6 @@ def experienceModel(model_no_prior, dataPath, outputPath, start_date):
         iter_training_set = iter_training_set + [trajIterChains[i]]
 
         # Process and calculate reward values after migration.
-        # rewardValues = processAfterMigrationData(train_chain, stateAttribute, model, visitedState, id_coords, coords_fnid, actionDim, outputPath)
         plugInDataPair(iter_training_set, stateAttribute, model, visitedState)
         # Train the model. We get the model after the past of the date.
         # change

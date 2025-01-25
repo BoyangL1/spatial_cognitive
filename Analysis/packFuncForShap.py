@@ -27,6 +27,7 @@ MAX_CPU_COUNT = mp.cpu_count() - 1
 # MAX_CPU_COUNT = 48
 
 def loadModel(who, date = None, prior = True, accumulate = False, tabular = False):
+    # todo: move to the utils
     '''
         Load the model from the model directory.
         Must correctly set the directory at first.
@@ -54,15 +55,13 @@ def loadModel(who, date = None, prior = True, accumulate = False, tabular = Fals
     model.loadParams(path)
     return model
 
-def modelPredict(X: np.ndarray[float, float], model = None, standardize = False,
+def modelPredict(X: np.ndarray[float, float], model, standardize = False,
                  attribute_type = 'reward', mu = None, sigma = None):
     '''
-        load the matrix of features, return the reward predicted by the model
+        Calculate the reward of the grid cells.
+        Load the matrix of processed features, return the reward predicted by the model.
+        The reward can be either standardize or not.
     '''
-
-    if model is None:
-        raise ValueError("The model must be provided.")
-
     feature_num = model.s_dim
     assert X.shape[1] == 7 * feature_num, "The input matrix does not have the correct number of features."
     state = X[:, :feature_num]
@@ -92,6 +91,10 @@ def modelPredict(X: np.ndarray[float, float], model = None, standardize = False,
     return y_pred
 
 def backgroundData(who: int, date = None):
+    '''
+    Construct the training feature array for the model prediction.
+    The array records all visited place with repetition.
+    '''
     # feature dataframe for query
     features_query = SIRLU.load_state_attrs(who)
     
@@ -103,16 +106,19 @@ def backgroundData(who: int, date = None):
     all_chains = SIRLU.loadTravelDataFromDicts(chains_dict)
 
     total_array_list = []
+    visit_id_list = []
     # unstack the visits: for chain on each day...
     for chain in all_chains:
         feature_array = []
-        for fnid in chain.fnid_chain:
+        for fnid, iden in zip(chain.fnid_chain, chain.id_chain):
             # search the feature vector.
-            feature_target = features_query.loc[features_query['fnid'] == fnid, :]
+            feature_vector = SIRLU.getStateRow(features_query, fnid)
             # ref tuple 单元素解包
-            fidx, = np.where(feature_target.columns != 'fnid')
-            feature_vector = feature_target.iloc[0, fidx].to_numpy()
+            # feature_target = features_query.loc[features_query['fnid'] == fnid, :]
+            # fidx, = np.where(feature_target.columns != 'fnid')
+            # feature_vector = feature_target.iloc[0, fidx].to_numpy()
             feature_array.append(feature_vector)
+            visit_id_list.append(iden)
         feature_array = np.array(feature_array)
 
         # calculate pe code vector 
@@ -126,11 +132,15 @@ def backgroundData(who: int, date = None):
         total_array_list.append(one_chain_array)
 
     total_array = np.vstack(total_array_list)
-    return total_array
-        
+    return total_array, visit_id_list
+
+
 def grouped_shap(shap_vals, features, groups):
+    '''
+    add the feature by grouping the variables.
+    '''
+    # revert the dictionary
     revert_dict = lambda d: dict(chain(*[zip(val, repeat(key)) for key, val in d.items()]))    
-    
     groupmap = revert_dict(groups)
     shap_Tdf = pd.DataFrame(shap_vals, columns=pd.Index(features, name='features')).T
     shap_Tdf['group'] = shap_Tdf.reset_index().features.map(groupmap).values
@@ -138,32 +148,45 @@ def grouped_shap(shap_vals, features, groups):
     return shap_grouped
 
 
-def sparseBackground(dataset: np.array):
+def sparseBackground(dataset: np.array, visited_id: list = None):
+    '''
+    Unique the background dataset with its frequency.  
+    '''
     column_name = ['C{:02d}'.format(i) for i in range(dataset.shape[1])]
     background_df = pd.DataFrame(dataset, columns=column_name)
+    assert len(visited_id) == dataset.shape[0], "The visited id list does not match the dataset."
+    background_df['iden'] = visited_id
     # count the unique values with its frequency
-    background_val_freq = background_df.groupby(column_name).size().reset_index(name='freq')
-    background_uni = background_val_freq.drop(columns=['freq']).to_numpy()
-    background_weight = background_val_freq['freq'].to_numpy()
-    return background_uni, background_weight
+    background_df_unique = background_df.drop_duplicates().set_index('iden')
+    background_val_freq = background_df.groupby(['iden']).size().reset_index(name='freq').set_index('iden')
+    background_df_unique = pd.merge(background_df_unique, background_val_freq, on='iden', how='left').reset_index()
+    
+    background_uni = background_df_unique.drop(columns=['freq', 'iden']).to_numpy()
+    background_weight = background_df_unique['freq'].to_numpy()
+    background_iden = background_df_unique['iden'].to_numpy()
+    return background_uni, background_weight, background_iden
     
 
-def modelRewardExplain(date: int, who: int, binary_be_vs_loc = True):
+def modelRewardExplain(date: int, who: int, binary_be_vs_loc = True, blank = True):
     '''
         Give the SHAP value by grouping the type.
     '''
-    
     print('Explaining person: {who:9d}, date: {date}'.format(who=who, date=date))
     model = loadModel(who=who, date=date)
 
-    dataset = backgroundData(who=who, date=date)
-    dataset_uni, dataset_freq = sparseBackground(dataset)
+    dataset, visited_id = backgroundData(who=who, date=date)
+    dataset_uni, dataset_freq, dataset_iden = sparseBackground(dataset, visited_id)
     print('Data with {k} rows'.format(k=dataset_uni.shape[0]))
 
-    built_bench = np.zeros(model.s_dim).reshape(1, -1)
-    locat_bench = np.mean(dataset[:, model.s_dim:], axis=0).reshape(1, -1)
-    # zero_bench = np.zeros(dataset.shape[1]).reshape(1, -1)
-    home_bench = np.hstack((built_bench, locat_bench))
+    if blank:
+        built_bench = np.zeros(model.s_dim).reshape(1, -1)
+        locat_bench = np.mean(dataset[:, model.s_dim:], axis=0).reshape(1, -1)
+        # zero_bench = np.zeros(dataset.shape[1]).reshape(1, -1)
+        # 基线意味着：建成环境取最小值，位置环境取平均值
+        home_bench = np.hstack((built_bench, locat_bench))
+    else:
+        # 全部取平均值
+        home_bench = np.mean(dataset, axis=0).reshape(1, -1)
 
     reward_vector = modelPredict(X=dataset_uni, model=model, attribute_type='reward')
     mu = np.average(reward_vector, weights=dataset_freq)
@@ -172,8 +195,8 @@ def modelRewardExplain(date: int, who: int, binary_be_vs_loc = True):
     def modelPredWrapper(X):
         return modelPredict(X, model=model, standardize=True,
                             attribute_type='reward', mu=mu, sigma=sigma)
-    
     # modelPredWrapper = partial(modelPredict, weight=dataset_freq, model=model, standardize=True, attribute_type='reward')
+    
     explainer = shap.PermutationExplainer(modelPredWrapper, home_bench)
     shap_values = explainer(dataset_uni)
     
@@ -188,12 +211,16 @@ def modelRewardExplain(date: int, who: int, binary_be_vs_loc = True):
             'Location': varname[len(varname_BE):]
         }
     else:
-        groupmap = {v: v for v in varname_BE}
+        groupmap = {v: [v] for v in varname_BE}
         groupmap['Location'] = varname_PE
     shap_grouped_by_classes = grouped_shap(shap_vals=shap_values.values, features=varname, groups=groupmap)
-    return shap_grouped_by_classes, dataset_freq
+    return shap_grouped_by_classes, dataset_freq, dataset_iden
 
-def modelUserDateCombination():
+def modelUserDateCombination(by_week=True):
+    '''
+    Extract the user and date combination from the model directory.
+    Each target for every seven days.
+    '''
     model_dir = './model/'
     # list all users with folder name consisting of all digits.
     # note: change here
@@ -203,48 +230,57 @@ def modelUserDateCombination():
     for user in user_list:
         evolution_model_path = model_dir + user + '/' + 'evolution_model/'
         date_list = [int(params.rstrip('.pickle')[-8:]) for params in os.listdir(evolution_model_path)]
-        date_list = date_list[::7]
+        date_list = SIRLU.extract_week_ends(date_list)[0] if by_week else date_list[::7]
         for date in date_list:
             combination.append((int(user), date))
     return combination
 
 
-def modelDateOfUser(user):
+def modelDateOfUser(user, by_week = True):
+    '''
+    Extract the date list of the user.
+    Each target for every seven days.
+    '''
     model_dir = './model/'
     user = SIRLU.toWhoString(user)
     evolution_model_path = model_dir + user + '/' + 'evolution_model/'
     date_list = [int(params.rstrip('.pickle')[-8:]) for params in os.listdir(evolution_model_path)]
-    date_list = date_list[::7]
+    if by_week:
+        date_list, _ = SIRLU.extract_week_ends(date_list)
+    else:        
+        date_list = date_list[::7]
     return date_list
 
-def explainOneUser(user, parallel=False, binary_be_vs_loc=True):
+def explainOneUser(user, parallel=False, binary_be_vs_loc=True, blank=True):
+    # parallel version of SHAP explain for one user.
     date_list = modelDateOfUser(user)
-    
     if not parallel:
         shap_dict = dict()
         # add reverse to mitigate the load balancing problem.
         for date in reversed(date_list):
-            shap_dict[date] = modelRewardExplain(date, who=user, binary_be_vs_loc=binary_be_vs_loc)
+            shap_dict[date] = modelRewardExplain(date, who=user, binary_be_vs_loc=binary_be_vs_loc, blank=blank)
     else:
         # parallel version
         CPU_COUNT = len(date_list)
-        combination = [(date, user, binary_be_vs_loc) for date in reversed(date_list)]
+        combination = [(date, user, binary_be_vs_loc, blank) for date in reversed(date_list)]
         with mp.Pool(CPU_COUNT) as pool:
             shap_dict_values = pool.starmap(modelRewardExplain, combination)
-        shap_dict = dict(zip(date_list, shap_dict_values))
+        shap_dict = dict(zip(reversed(date_list), shap_dict_values))
     return shap_dict
 
 
-def explainAllRewards(parallel = False, binary_be_vs_loc=True):
+def explainAllRewards(parallel = False, binary_be_vs_loc=True, blank=True):
+    # parallel version of SHAP explain for all users.
     combination = modelUserDateCombination()
     shap_dict = dict()
     
     if not parallel:
         for user, date in combination:
-            shap_dict[(user, date)] = modelRewardExplain(date, who=user, binary_be_vs_loc=binary_be_vs_loc)
+            shap_dict[(user, date)] = modelRewardExplain(date, who=user, binary_be_vs_loc=binary_be_vs_loc,
+                                                         blank=blank)
     else:
         # parallel version
-        combination_switch = [(date, user, binary_be_vs_loc) for user, date in combination]
+        combination_switch = [(date, user, binary_be_vs_loc, blank) for user, date in combination]
         with mp.Pool(MAX_CPU_COUNT) as pool:
             shap_dict_values = pool.starmap(modelRewardExplain, combination_switch)
         for idx, (user, date) in enumerate(combination):
@@ -259,8 +295,8 @@ def modelRewardBaselineCalculation(date: int, who: int):
     model = loadModel(who=who, date=date)
     # modelPredWrapper = partial(modelPredict, model=model, attribute_type='reward')
 
-    dataset = backgroundData(who=who, date = date)
-    dataset_uni, dataset_freq = sparseBackground(dataset)
+    dataset, visited_id = backgroundData(who=who, date = date)
+    dataset_uni, dataset_freq, dataset_iden = sparseBackground(dataset, visited_id)
     
     reward_vector = modelPredict(X=dataset_uni, model=model, attribute_type='reward')
     mu = np.average(reward_vector, weights=dataset_freq)
@@ -289,14 +325,16 @@ if __name__ == '__main__':
     '''
     Half Parallel Version
     '''
-    # model_dir = './model/'
-    # user_list = [int(name) for name in os.listdir(model_dir) if name.isdigit()]
-    # user_list.sort()
-    # for user in user_list:
-    #     # note: remember to change back
-    #     res = explainOneUser(user, parallel=True)
-    #     with open('./product/shap_res_{:09d}.pkl'.format(user), 'wb') as f:
-    #         pickle.dump(res, f)
+    model_dir = './model/'
+    user_list = [int(name) for name in os.listdir(model_dir) if name.isdigit()]
+    user_list.sort()
+    user_list = user_list[1:]
+    # user_list = [1102234]
+    for user in user_list:
+        # note: remember to change back
+        res = explainOneUser(user, parallel=True, binary_be_vs_loc=False)
+        with open('./product/shap_res_{:09d}.pkl'.format(user), 'wb') as f:
+            pickle.dump(res, f)
     '''
     By Hand
     '''
@@ -304,9 +342,9 @@ if __name__ == '__main__':
     # user_list = [int(name) for name in os.listdir(model_dir) if name.isdigit()]
     # user_list.sort()
 
-    # user = user_list[0]
-    # res = explainOneUser(user, parallel=True)
-    # with open('./product/shap_res_{:98d}.pkl'.format(user), 'wb') as f:
+    # user = 1102234
+    # res = explainOneUser(user, parallel=True, binary_be_vs_loc=False)
+    # with open('./product/shap_res_{:09d}.pkl'.format(user), 'wb') as f:
     #     pickle.dump(res, f)
     '''
     Inspect the baseline.

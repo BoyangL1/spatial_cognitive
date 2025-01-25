@@ -13,8 +13,9 @@ from SCBIRL_Global_PE.utils import TravelData, Traveler, Padding
 from geopy.distance import geodesic
 import pickle
 
+from typing import List
 
-def trajectoryCompute(model, tcs: list[TravelData], state_attribute: pd.DataFrame):
+def trajectoryCompute(model, tcs: List[TravelData], state_attribute: pd.DataFrame):
     '''
         Compute the reward and value of the trajectory using the model.
         Based on Transformer-based model.
@@ -50,7 +51,7 @@ def predictRewardEvaluation(reward_tensor: np.array, selection_mask: np.array):
     # calculate the mean and variance of the reward
     return reward_df
     
-def predictQValueEvalutaion(tcs: list[TravelData], q_value_tensor: np.array, selection_mask: np.array, coords_id: dict):
+def predictQValueEvalutaion(tcs: List[TravelData], q_value_tensor: np.array, selection_mask: np.array, coords_id: dict):
 
     #  求出每一步最大Q值的动作索引
     max_q_action_idx = np.argmax(q_value_tensor, axis = -1)

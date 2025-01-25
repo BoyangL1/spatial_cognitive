@@ -1,5 +1,4 @@
 import haiku as hk
-
 from jax import grad, jit, value_and_grad
 from jax import random
 from jax.example_libraries import optimizers
@@ -16,14 +15,12 @@ from tqdm import tqdm
 from abc import ABC, abstractmethod
 import time, datetime
 
-
 from sklearn.preprocessing import MinMaxScaler
 
 from SCBIRL_Global_PE.EnDecoder import kl_divergence, klGaussianStandard
 from SCBIRL_Global_PE.EnDecoderCompare import *
 from SCBIRL_Global_PE.SCBIRLTransformer import avril
 from SCBIRL_Global_PE.utils import Padding, normalize
-
 
 class avril_without_pe(avril):
     

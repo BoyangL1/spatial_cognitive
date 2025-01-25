@@ -44,6 +44,15 @@ from itertools import combinations
 from multiprocessing import Pool, cpu_count
 import time
 
+import numpy as np
+import pandas as pd
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import geopandas as gpd
+import networkx as nx
+from shapely.geometry import Point
+
+
 def coords2compression(model, coords, depth: int):
     '''
     Transform the coordinates to the compressed representation by the model.
@@ -56,7 +65,7 @@ def coords2compression(model, coords, depth: int):
     key = model.key
     c_params = model.c_params
     pe_real_compressed, pe_imag_compressed = model.compress_pe_code_complex.apply(c_params, key, gc_vectors, target_dim=depth)
-    # transform the gc patterns to compressed representation, 13D vector
+    # transform the gc patterns to compressed representation, vector with dimension of depth
     pe_compressed = pe_real_compressed + pe_imag_compressed
     return pe_compressed
 
@@ -172,8 +181,22 @@ def computeTransitionProb(model, who, date):
     res = (np.array(transitionProbs), coordsIdx)
     return res
 
+def topoResPath(who):
+    who_string = SIRLU.toWhoString(who)
+    save_dir = f'./product/topoMap/{who_string}/' 
+    return save_dir
 
-def clusterLocations(who, date):
+def topoResSave(res, who, date):
+    """
+    Save the topological results to a pickle file.
+    """
+    save_dir = topoResPath(who)
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    with open(save_dir + f'topo_res_{date:d}.pickle', 'wb') as f:
+        pickle.dump(res, f)
+
+def clusterLocations(who, date, res_save = True):
     who_string = SIRLU.toWhoString(who) + '/'
     data_dir = UserDataPart + who_string
     model_dir = './model/' + who_string
@@ -264,7 +287,72 @@ def clusterLocations(who, date):
     # return the result
     res = (transitionProbsEdit, id_coorders_mapping_edit, stationary, cluster_labels)
     
+    if res_save:
+        topoResSave(res, who, date)
+    
     return res
+
+
+def cogTopoGraph(who, date):
+    transitionProbsEdit, id_coorders_mapping_edit, stationary, cluster_labels = clusterLocations(who, date)
+    keylist = list(id_coorders_mapping_edit.keys())
+    
+    # average the coordinates of the points in each cluster
+    labpos = [np.where(cluster_labels == lab)[0] for lab in np.unique(cluster_labels)]
+    transitionClust = np.empty((len(labpos), len(labpos)))
+    for i in range(len(labpos)):
+        source = transitionProbsEdit[labpos[i], :].mean(axis=0)
+        for j in range(len(labpos)):
+            transitionClust[i, j] = source.take(labpos[j]).sum()
+            
+    transitionClust /= transitionClust.sum(axis=1)[:, None]
+    weight = computeTransLimit(transitionClust).real
+    transitionCorrected = transitionClust * weight
+
+    # ref 矩阵中的累积最小值
+    # search the position where sits the smallest values whose cumulated sum is larger than 0.05
+    threshold = 0.5
+    transitionCorrectedFlatten = transitionCorrected.flatten()
+    sorted = np.sort(transitionCorrectedFlatten)
+    cut_pos = len(np.where(np.cumsum(sorted) <= threshold)[0])
+    smalllest_idx = np.argsort(transitionCorrectedFlatten)[:cut_pos]
+    # transitionCorrectedFlatten[smalllest_idx] = np.nan
+    smalllest_idx_2d = np.unravel_index(smalllest_idx, transitionCorrected.shape)
+
+    weighgFlatten = weight.flatten()
+    sorted = np.sort(weighgFlatten)
+    cut_pos = len(np.where(np.cumsum(sorted) <= threshold)[0])
+    smalllest_idx_weight = np.argsort(weighgFlatten)[:cut_pos]
+
+    transAdj = transitionCorrected.copy()
+    transAdj[smalllest_idx_2d] = 0
+
+    # get the average position of the points in each cluster
+    cluster_coords_array = []
+    for onelab2pos in labpos:
+        cluster_coords_list = [id_coorders_mapping_edit[keylist[onepos]] for onepos in onelab2pos]
+        cluster_coords = np.array(cluster_coords_list).mean(axis=0)
+        cluster_coords = tuple(cluster_coords.tolist())
+        cluster_coords_array.append(cluster_coords)
+
+    # Create a graph from the CSV data
+    G = nx.DiGraph()
+    for i, coord in enumerate(cluster_coords_array):
+        if not np.isin(i, smalllest_idx_weight):
+            G.add_node(str(coord), pos=coord, weight=weight[i, 0])
+
+    # count = 10
+    size = len(cluster_coords_array)
+    for i in range(size):
+        if np.isin(i, smalllest_idx_weight):
+            continue
+        for j in range(size):
+            if i != j and not np.isin(j, smalllest_idx_weight):
+                weight_value = transAdj[i, j]
+                if weight_value > 0:
+                    G.add_edge(str(cluster_coords_array[i]), str(cluster_coords_array[j]), weight=weight_value)
+    
+    return G
 
 
 if __name__ == '__main__':

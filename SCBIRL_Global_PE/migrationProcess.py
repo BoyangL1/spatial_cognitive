@@ -11,119 +11,36 @@ from .utils import *
 from .EnDecoder import *
 from scipy.special import softmax
 
-def computeRewardOrValue(model, input_path, output_path, attribute_type='value'):
-    """
-    Compute rewards or state values for each state using a given model and save to a CSV file.
-
-    Parameters:
-    - model: The trained model. Should have a method `rewardValue` for computing rewards and `QValue` for computing Q values.
-    - input_path (str): Path to the input CSV file containing states.
-    - output_path (str): Path to save the output CSV file with computed attributes (rewards or state values).
-    - attribute_type (str): Either 'value' to compute state values or 'reward' to compute rewards.
-
-    Returns:
-    None. Writes results to the specified output CSV file.
-    """
-    
-    # Using preprocessing function from utils
-    state_attribute, _ = preprocessStateAttributes('./data/before_migrt.json', input_path)
-
-    computeFunc = getComputeFunction(model, attribute_type)
-
-    with open("./data/coords_fnid_mapping.pkl", "rb") as f:
-        coords_fnid = pickle.load(f)
-
-    rewardValues = []
-    for coords, fnid in tqdm(coords_fnid.items(), total=len(coords_fnid),desc="compute "+ attribute_type):
-        if fnid not in state_attribute.fnid.values:
-            continue
-        # get state attribute of this fnid
-        state = getStateRow(state_attribute, fnid)
-        pe_code = globalPE(coords,len(state)).flatten()
-        # add three dimension
-        pe_code = np.expand_dims(np.expand_dims(np.expand_dims(pe_code, axis=0), axis=0), axis = 0)
-        state = np.expand_dims(np.expand_dims(np.expand_dims(state, axis=0), axis=0), axis = 0)
-
-        # get reward value
-        r = float(computeFunc(state,pe_code))
-        rewardValues.append((coords, r))
-
-    reward_df = pd.DataFrame(rewardValues, columns=['coords', 'reward'])
-    if output_path is not None:
-        reward_df.to_csv(output_path, index=False)
-    return
-
-def computeTransitionProb(model, input_path, output_path):
-    """
-    Compute transition probabilities for each state using a given model and save to a CSV file.
-
-    Parameters:
-    - model: The trained model. Should have a method `transitionProb` for computing transition probabilities.
-    - input_path (str): Path to the input CSV file containing states.
-    - output_path (str): Path to save the output CSV file with computed transition probabilities.
-
-    Returns:
-    None. Writes results to the specified output CSV file.
-    """
-    state_attribute, _ = preprocessStateAttributes('./data/before_migrt.json',input_path)
-    computeFunc = getComputeFunction(model, 'transition_prob')
-    size = model.a_dim
-
-    with open("./data/id_coords_mapping.pkl", "rb") as f:
-        coords_id = pickle.load(f)
-    with open("./data/coords_fnid_mapping.pkl", "rb") as f:
-        coords_fnid = pickle.load(f)
-
-    # ref sort the dictionary by value
-    coords_id = dict(sorted(coords_id.items()))
-    transitionProbs = []
-    coordsIdx = []
-    for id, coords in tqdm(coords_id.items(), total=len(coords_id),desc="compute transition probability"):
-        fnid = coords_fnid[coords]
-        if fnid not in state_attribute.fnid.values:
-            transProbVec = np.full(size, np.nan)
-        else:
-        # get state attribute of this fnid
-            state = getStateRow(state_attribute, fnid)
-            pe_code = globalPE(coords,len(state)).flatten()
-            # add three dimension
-            pe_code = np.expand_dims(np.expand_dims(np.expand_dims(pe_code, axis=0), axis=0), axis = 0)
-            state = np.expand_dims(np.expand_dims(np.expand_dims(state, axis=0), axis=0), axis = 0)
-            # get transition probability
-            transProbVec = computeFunc(state,pe_code)
-        transitionProbs.append(transProbVec)
-        coordsIdx.append(coords)
-    
-    res = (np.array(transitionProbs), coordsIdx)
-    with open(output_path, 'wb') as f:
-        pickle.dump(res, f)
-    return     
-
 def getComputeFunction(model, attribute_type):
-    """Return the appropriate function to compute either 'value' or 'reward'."""
+    """
+    Return the appropriate function for model computation.
+    attribute_type should be either 'value', 'reward', or 'transition_prob'.
+    
+    The fed grid code should be complex array.
+    """
     if attribute_type == 'value':
-        return lambda state,grid_code: np.max(model.QValue(state,grid_code))
+        return lambda state,grid_code: np.max(model.QValue(state, grid_code))
     elif attribute_type == 'transition_prob':
-        return lambda state,grid_code: softmax(model.QValue(state,grid_code)[0][0])
+        return lambda state,grid_code: softmax(model.QValue(state, grid_code)[0][0])
     elif attribute_type == 'reward':
-        return lambda state,grid_code: model.reward(state,grid_code)[0][0][0]
+        return lambda state,grid_code: model.reward(state, grid_code)[0][0][0]
     else:
-        raise ValueError("attribute_type should be either 'value' or 'reward'.")
+        raise ValueError("attribute_type should be either 'value', 'reward', or 'transition_prob'.")
 
 
 def readAndPrepareData(user_data_path, start_date):
     """
-    Reads and prepares data for spatial cognition analysis.
+    Reads and prepares data. 
+    Return visited coordinates, divide the data into two parts, and preprocess state attributes.
 
     Args:
         user_data_path (str): The path to the user data.
         start_date (str): The start date for filtering travel chains.
 
     Returns:
-        tuple: A tuple containing the following:
-            - visitedState (set): A set of visited states before migration.
-            - trajChains (list): A list of travel chains after migration.
-            - stateAttribute (dict): A dictionary of preprocessed state attributes.
+        - visitedState (set): A set of visited coordinates before start date
+        - trajInitChains/trajIterChains (list): A list of travel chains before/after migration.
+        - stateAttribute (pd.DataFrame): Dataset of preprocessed state attributes.
     """
     all_traj_path = user_data_path + 'all_traj.json'
     all_traj_feature_path = user_data_path + 'all_traj_feature.csv'
@@ -143,8 +60,70 @@ def readAndPrepareData(user_data_path, start_date):
 
     return visitedState, trajInitChains, trajIterChains, stateAttribute
 
+def afterMigrt(model, dataPath, outputPath, start_date, iter_type):
+    '''
+    Iteratively train the model with real traj data.
+    '''
+    assert iter_type in ['recent', 'prior'], "Argument `iter_type` should be either 'recent' or 'prior'."
+    if iter_type == 'recent':
+        model_tag = 'iterated'
+        folder_name = "evolution_model/"
+    else:
+        model_tag = 'increased'
+        folder_name = 'empirical_model/'
+    
+    full_traj_path = dataPath + "all_traj.json"
+
+    # Load the mapping between IDs and their corresponding fnid.
+    with open(dataPath + "id_coords_mapping.pkl", "rb") as f:
+        id_coords = pickle.load(f)
+    with open(dataPath + "coords_fnid_mapping.pkl", "rb") as f:
+        coords_fnid = pickle.load(f)
+
+    all_chains = loadTravelDataFromDicts(loadJsonFile(full_traj_path))
+    actionDim = getActionDim(all_chains)
+
+    # Read and preprocess data for analysis.
+    visitedState, trajInitChains, trajIterChains, stateAttribute = readAndPrepareData(dataPath, start_date)
+
+    # Initialize an empty DataFrame with predefined columns
+    resultsDf = pd.DataFrame(columns=['coords', 'fnid'])
+    # Iterate over the coords_fnid dictionary and append each key-value pair to resultsDf
+    for key, value in coords_fnid.items():
+        # Append the key-value pair as a new row to resultsDf
+        resultsDf = resultsDf._append({'coords': key, 'fnid': value}, ignore_index=True)
+
+
+    modelDir = outputPath + folder_name
+    if not os.path.exists(modelDir):
+        os.makedirs(modelDir)
+    memory_buffer = 10 # days
+
+    for i in range(len(trajIterChains)):
+
+        if i < memory_buffer:
+            iter_training_set = trajInitChains[-(memory_buffer-i):] + trajIterChains[:i]
+        else:
+            iter_training_set = trajIterChains[i-memory_buffer:i]
+        iter_training_set = iter_training_set + [trajIterChains[i]]
+
+        # Process and calculate reward values after migration.
+        plugInDataPair(iter_training_set, stateAttribute, model, visitedState)
+
+        # Train the model.
+        # change
+        # weights = [1 / 2 ** (memory_buffer - i) for i in range(memory_buffer)]
+        weights = None
+        model.train(iters=1000,loss_threshold=0.01, weights=weights)
+
+        # Save the current model state.
+        modelSavePath = modelDir + model_tag + '_model_' + str(iter_training_set[-1].date) + ".pickle"
+        model.modelSave(modelSavePath)
+
+# note: below are functions deprecated.
 
 def processBeforeMigrationData(state_attribute, visitedState, computeFunc, id_coords, coords_fnid, actionDim):
+    # // deprecated
     """
     Process and calculate transition probabilities for states before migration. 
     It updates the state attributes with computed action probabilities.
@@ -196,8 +175,8 @@ def processBeforeMigrationData(state_attribute, visitedState, computeFunc, id_co
     dfResults = pd.DataFrame(beforeMigrtTrans, columns=columns)
     dfResults.to_csv(f"./data_pe/before_migrt_transProb.csv", index=False)
 
-
 def processAfterMigrationData(tc, stateAttribute, model, visitedState, id_coords, coords_fnid, actionDim, outputPath="./data_pe/"):
+    # // deprecated
     """
     Process data after migration, including calculating rewards and transition probabilities.
 
@@ -267,61 +246,93 @@ def processAfterMigrationData(tc, stateAttribute, model, visitedState, id_coords
 
     return rewardValues
 
+def computeRewardOrValue(model, input_path, output_path, attribute_type='value'):
+    # // deprecated
+    """
+    Compute rewards or state values for each state using a given model and save to a CSV file.
 
+    Parameters:
+    - model: The trained model. Should have a method `rewardValue` for computing rewards and `QValue` for computing Q values.
+    - input_path (str): Path to the input CSV file containing states.
+    - output_path (str): Path to save the output CSV file with computed attributes (rewards or state values).
+    - attribute_type (str): Either 'value' to compute state values or 'reward' to compute rewards.
 
-def afterMigrt(model, dataPath, outputPath, start_date, iter_type):
-    assert iter_type in ['recent', 'prior'], "Argument `iter_type` should be either 'recent' or 'prior'."
-    if iter_type == 'recent':
-        model_tag = 'iterated'
-        folder_name = "evolution_model/"
-    else:
-        model_tag = 'increased'
-        folder_name = 'empirical_model/'
+    Returns:
+    None. Writes results to the specified output CSV file.
+    """
     
-    full_traj_path = dataPath + "all_traj.json"
+    # Using preprocessing function from utils
+    state_attribute, _ = preprocessStateAttributes('./data/before_migrt.json', input_path)
 
-    # Load the mapping between IDs and their corresponding fnid.
-    with open(dataPath + "id_coords_mapping.pkl", "rb") as f:
-        id_coords = pickle.load(f)
-    with open(dataPath + "coords_fnid_mapping.pkl", "rb") as f:
+    computeFunc = getComputeFunction(model, attribute_type)
+
+    with open("./data/coords_fnid_mapping.pkl", "rb") as f:
         coords_fnid = pickle.load(f)
 
-    all_chains = loadTravelDataFromDicts(loadJsonFile(full_traj_path))
-    actionDim = getActionDim(all_chains)
+    rewardValues = []
+    for coords, fnid in tqdm(coords_fnid.items(), total=len(coords_fnid),desc="compute "+ attribute_type):
+        if fnid not in state_attribute.fnid.values:
+            continue
+        # get state attribute of this fnid
+        state = getStateRow(state_attribute, fnid)
+        pe_code = globalPE(coords,len(state)).flatten()
+        # add three dimension
+        pe_code = np.expand_dims(np.expand_dims(np.expand_dims(pe_code, axis=0), axis=0), axis = 0)
+        state = np.expand_dims(np.expand_dims(np.expand_dims(state, axis=0), axis=0), axis = 0)
 
-    # Read and preprocess data for analysis.
-    visitedState, trajInitChains, trajIterChains, stateAttribute = readAndPrepareData(dataPath, start_date)
+        # get reward value
+        r = float(computeFunc(state,pe_code))
+        rewardValues.append((coords, r))
 
-    # Initialize an empty DataFrame with predefined columns
-    resultsDf = pd.DataFrame(columns=['coords', 'fnid'])
-    # Iterate over the coords_fnid dictionary and append each key-value pair to resultsDf
-    for key, value in coords_fnid.items():
-        # Append the key-value pair as a new row to resultsDf
-        resultsDf = resultsDf._append({'coords': key, 'fnid': value}, ignore_index=True)
+    reward_df = pd.DataFrame(rewardValues, columns=['coords', 'reward'])
+    if output_path is not None:
+        reward_df.to_csv(output_path, index=False)
+    return
 
+def computeTransitionProb(model, input_path, output_path):
+    # // deprecated
 
-    modelDir = outputPath + folder_name
-    if not os.path.exists(modelDir):
-        os.makedirs(modelDir)
-    memory_buffer = 10 # days
+    """
+    Compute transition probabilities for each state using a given model and save to a CSV file.
 
-    for i in range(len(trajIterChains)):
+    Parameters:
+    - model: The trained model. Should have a method `transitionProb` for computing transition probabilities.
+    - input_path (str): Path to the input CSV file containing states.
+    - output_path (str): Path to save the output CSV file with computed transition probabilities.
 
-        if i < memory_buffer:
-            iter_training_set = trajInitChains[-(memory_buffer-i):] + trajIterChains[:i]
+    Returns:
+    None. Writes results to the specified output CSV file.
+    """
+    state_attribute, _ = preprocessStateAttributes('./data/before_migrt.json',input_path)
+    computeFunc = getComputeFunction(model, 'transition_prob')
+    size = model.a_dim
+
+    with open("./data/id_coords_mapping.pkl", "rb") as f:
+        coords_id = pickle.load(f)
+    with open("./data/coords_fnid_mapping.pkl", "rb") as f:
+        coords_fnid = pickle.load(f)
+
+    # ref sort the dictionary by value
+    coords_id = dict(sorted(coords_id.items()))
+    transitionProbs = []
+    coordsIdx = []
+    for id, coords in tqdm(coords_id.items(), total=len(coords_id),desc="compute transition probability"):
+        fnid = coords_fnid[coords]
+        if fnid not in state_attribute.fnid.values:
+            transProbVec = np.full(size, np.nan)
         else:
-            iter_training_set = trajIterChains[i-memory_buffer:i]
-        iter_training_set = iter_training_set + [trajIterChains[i]]
-
-        # Process and calculate reward values after migration.
-        plugInDataPair(iter_training_set, stateAttribute, model, visitedState)
-
-        # Train the model.
-        # change
-        # weights = [1 / 2 ** (memory_buffer - i) for i in range(memory_buffer)]
-        weights = None
-        model.train(iters=1000,loss_threshold=0.01, weights=weights)
-
-        # Save the current model state.
-        modelSavePath = modelDir + model_tag + '_model_' + str(iter_training_set[-1].date) + ".pickle"
-        model.modelSave(modelSavePath)
+        # get state attribute of this fnid
+            state = getStateRow(state_attribute, fnid)
+            pe_code = globalPE(coords,len(state)).flatten()
+            # add three dimension
+            pe_code = np.expand_dims(np.expand_dims(np.expand_dims(pe_code, axis=0), axis=0), axis = 0)
+            state = np.expand_dims(np.expand_dims(np.expand_dims(state, axis=0), axis=0), axis = 0)
+            # get transition probability
+            transProbVec = computeFunc(state,pe_code)
+        transitionProbs.append(transProbVec)
+        coordsIdx.append(coords)
+    
+    res = (np.array(transitionProbs), coordsIdx)
+    with open(output_path, 'wb') as f:
+        pickle.dump(res, f)
+    return     
