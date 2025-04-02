@@ -194,6 +194,11 @@ def topoNodeCluster(who, method = 'spectral', optimal='silhouette'):
         for i, within_same_communes in enumerate(communes):
             cluster_idx = np.array(list(within_same_communes))
             labels[cluster_idx] = i
+    elif method == 'hdbscan':
+        clusterer = HDBSCAN(min_cluster_size=2, min_samples=2, metric='precomputed')
+        disimilarity = 1 - affinity
+        np.fill_diagonal(disimilarity, 0)
+        labels = clusterer.fit_predict(disimilarity)
     return labels
     
 def nodeVerTraj(who, labels):

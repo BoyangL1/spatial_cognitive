@@ -10,8 +10,18 @@ import geopandas as gpd
 
 import json
 import pickle
+import logging
 from collections import namedtuple
 from SCBIRL_Global_PE.utils import Traveler, training_baseline_count, UserDataPart
+import warnings
+
+# # 捕获 RuntimeWarning 并打印详细信息
+# def custom_warning_handler(message, category, filename, lineno, file=None, line=None):
+#     if category == RuntimeWarning:
+#         print(f"WARNING: {message} (Category: {category.__name__})")
+#         print(f"Occurred in {filename}, line {lineno}")
+
+# warnings.showwarning = custom_warning_handler
 
 source_type_dict = {
     './data/user_data_survey/': 'featureset.csv',
@@ -40,6 +50,51 @@ def build_both_chains(group):
     id_chain = build_id_chain(group)
     fnid_chain = build_fnid_chain(group)
     return pd.Series({'travel_chain': travel_chain, 'id_chain': id_chain, 'fnid_chain':fnid_chain})
+
+
+def time_slot_distribution(df_time_period, normalize = True):
+    arr = np.zeros(24 * 4)
+    for _, t_per in df_time_period.iterrows():
+        # 从时间戳中提取时间部分
+        start_time = pd.to_datetime(t_per['t_start']).time()
+        end_time = pd.to_datetime(t_per['t_end']).time()
+        
+        # 转换为分钟数
+        start_minutes = start_time.hour * 60 + start_time.minute
+        end_minutes = end_time.hour * 60 + end_time.minute
+        
+        # 计算开始和结束的时间槽
+        start_slot = start_minutes // 15
+        end_slot = end_minutes // 15
+        
+        # 如果在一个槽内
+        if start_slot == end_slot:
+            ratio = (end_minutes - start_minutes) / 15
+            arr[start_slot] += ratio
+        else:
+            # 计算开始时间槽的覆盖比例
+            start_ratio = (15 - (start_minutes % 15)) / 15
+            arr[start_slot] += start_ratio
+            # 计算结束时间槽的覆盖比例
+            end_ratio = (end_minutes % 15) / 15
+            arr[end_slot] += end_ratio
+            # 处理中间完整的时间槽
+            for slot in range(start_slot + 1, end_slot):
+                arr[slot] += 1.0
+                    
+    if normalize:
+        arr = arr / arr.sum()
+    return arr
+
+
+def userTimeUseDistribution(data, id_coords_mapping):
+    res = dict()
+    for ind, coords in id_coords_mapping.items():  # 修改这里
+        data_tgt = data.loc[(data['longitude'] == coords[0]) & (data['latitude'] == coords[1])]  # 同时修改这里的条件写法
+        df_time_period = data_tgt.loc[:, ['t_start', 't_end']].copy()
+        
+        res[ind] = time_slot_distribution(df_time_period)
+    return res
 
 
 def int64_converter(obj):
@@ -97,6 +152,7 @@ def writing2DataFolder(data):
     
     all_feature = featureset2allFeature(data)
     coords_fnid_mapping, id_coords_mapping = createCoordsMapping(data)
+    id_tempo_mapping = userTimeUseDistribution(data, id_coords_mapping)
     all_json = featureset2Json(data)
     visited_date = data['date'].unique().tolist()
     if len(visited_date) < 3 * training_baseline_count:
@@ -104,7 +160,7 @@ def writing2DataFolder(data):
     else:
         iter_start_date = visited_date[training_baseline_count - 1]
     traveler = Traveler(who=who, visit_date=visited_date, iter_start_date=iter_start_date)
-
+    
     all_feature.to_csv(writing_path + 'all_traj_feature.csv',index=False)
     
     with open(writing_path + 'all_traj.json', 'w') as file:
@@ -115,10 +171,12 @@ def writing2DataFolder(data):
         pickle.dump(id_coords_mapping, f)
     with open(writing_path + 'traveler_info.pkl', 'wb') as f:
         pickle.dump(traveler, f)
-
+    with open(writing_path + 'id_tempo_mapping.pkl', 'wb') as f:
+        pickle.dump(id_tempo_mapping, f)
 
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
     read_path = './data/'
     
     df = pd.read_csv(read_path + source_type_dict[UserDataPart])
@@ -127,5 +185,4 @@ if __name__ == '__main__':
     for i in range(len(df_lists)):
         data = df_lists[i]
         writing2DataFolder(data)
-    
-    
+

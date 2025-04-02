@@ -15,9 +15,9 @@ TravelData = namedtuple('TravelChain', ['date', 'travel_chain','id_chain','fnid_
 Traveler = namedtuple('Traveler', ['who', 'visit_date', 'iter_start_date'])
 training_baseline_count = 50
 
-# UserDataPart = './data/user_data_survey/'
+UserDataPart = './data/user_data_survey/'
 # UserDataPart = './data/user_data_migrt/'
-UserDataPart = './data/user_data_test/'
+# UserDataPart = './data/user_data_test/'
 
 Padding = -999
 
@@ -319,6 +319,20 @@ def load_id_coords_mapping(who: int):
     with open(id_coord_mapping_path, "rb") as f:
         coords_id = pickle.load(f)
     return coords_id
+
+def load_id_tempo_mapping(who: int):
+    """
+    Load the temporal distribution mapping for a user.
+    Args:
+        who (int): User ID.
+    Returns:
+        dict: A dictionary mapping location IDs to their temporal distributions.
+    """
+    data_dir = UserDataPart
+    id_tempo_mapping_path = data_dir + f'{toWhoString(who)}/id_tempo_mapping.pkl'
+    with open(id_tempo_mapping_path, "rb") as f:
+        id_tempo_mapping = pickle.load(f)
+    return id_tempo_mapping
 
 def load_fnid_coords_mapping(who: int):
     '''
