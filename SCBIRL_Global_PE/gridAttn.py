@@ -111,7 +111,7 @@ class GridCellPositionalEncoding(hk.Module):
 
         Parameters:
         - positions: (batch_size, seq_length, d) tensor, input position vectors.
-        - q: (batch_size,  num_heads, seq_length, 2nS) tensor, input token embeddings.
+        - q: (batch_size, num_heads, seq_length, 2nS) tensor, input token embeddings.
 
         Returns:
         - q(k)_rotated: (batch_size, num_heads, seq_length, 2nS) tensor, output after transformation.

@@ -4,22 +4,24 @@ import jax.numpy as np
 from .gridAttn import GridCellPositionalEncoding
 
 class MultiHeadSelfGridAttention(hk.Module):
-    def __init__(self, d_model, num_heads):
+    def __init__(self, d_model, num_heads, use_rotation=False):
         super().__init__()
         self.d_model = d_model
         self.num_heads = num_heads
         self.depth = d_model // self.num_heads
+        self.use_rotation = use_rotation
 
         self.wq = hk.Linear(self.d_model)
         self.wk = hk.Linear(self.d_model)
         self.wv = hk.Linear(self.d_model)
         self.dense = hk.Linear(self.d_model)
         
-        self.grid_pe = GridCellPositionalEncoding(
-            dimension=2,
-            qk_dim=d_model,
-            num_heads=num_heads
-        )
+        if use_rotation:
+            self.grid_pe = GridCellPositionalEncoding(
+                dimension=2,
+                qk_dim=d_model,
+                num_heads=num_heads
+            )
 
     def split_heads(self, x, batch_size):
         x = x.reshape(batch_size, -1, self.num_heads, self.depth)
@@ -44,10 +46,13 @@ class MultiHeadSelfGridAttention(hk.Module):
         key = self.split_heads(key, batch_size)
         value = self.split_heads(value, batch_size)
 
-        # 应用网格细胞位置编码
-        query_rot, key_rot = self.grid_pe(positions, query, key, rng)
+        if self.use_rotation:
+            # 应用网格细胞位置编码
+            query_rot, key_rot = self.grid_pe(positions, query, key, rng)
+            attention, _ = self.attention(query_rot, key_rot, value)
+        else:
+            attention, _ = self.attention(query, key, value)
 
-        attention, _ = self.attention(query_rot, key_rot, value)
         attention = attention.transpose(0, 2, 1, 3)
         concat_attention = attention.reshape(batch_size, seq_len, -1, self.d_model)
         output = self.dense(concat_attention)
@@ -66,9 +71,10 @@ class PointWiseFeedForwardNetwork(hk.Module):
         return x
 
 class TransformerLayer(hk.Module):
-    def __init__(self, d_model, num_heads, dff, rate=0.1):
+    def __init__(self, d_model, num_heads, dff_ratio, use_rotation=False, rate=0.1):
         super().__init__()
-        self.mha = MultiHeadSelfGridAttention(d_model, num_heads)
+        dff = d_model * dff_ratio
+        self.mha = MultiHeadSelfGridAttention(d_model, num_heads, use_rotation=use_rotation)
         self.ffn = PointWiseFeedForwardNetwork(d_model, dff)
         self.layernorm1 = hk.LayerNorm(axis=-1, create_scale=True, create_offset=True)
         self.layernorm2 = hk.LayerNorm(axis=-1, create_scale=True, create_offset=True)
@@ -87,6 +93,8 @@ class TransformerLayer(hk.Module):
         out2 = self.layernorm2(out1 + ffn_output)
 
         return out2
+
+
 
 "********************Decoder Layer******************"
 
@@ -145,30 +153,30 @@ class MultiHeadAttention(hk.Module):
 
 
 class TransformerDecoderLayer(hk.Module):
-    def __init__(self, d_model, num_heads, dff, rate=0.1):
+    def __init__(self, d_model, num_heads, dff_ratio, use_rotation=False, rate=0.1):
         super().__init__()
-        self.mha1 = MultiHeadAttention(d_model, num_heads) 
-        self.mha2 = MultiHeadAttention(d_model, num_heads) 
+        dff = d_model * dff_ratio
+        self.mha1 = MultiHeadSelfGridAttention(d_model, num_heads, use_rotation=use_rotation)
+        self.mha2 = MultiHeadSelfGridAttention(d_model, num_heads, use_rotation=False)
         self.ffn = PointWiseFeedForwardNetwork(d_model, dff)
-
         self.layernorm1 = hk.LayerNorm(axis=-1, create_scale=True, create_offset=True)
         self.layernorm2 = hk.LayerNorm(axis=-1, create_scale=True, create_offset=True)
         self.layernorm3 = hk.LayerNorm(axis=-1, create_scale=True, create_offset=True)
-
         self.dropout = hk.dropout
         self.rate = rate
 
     def __call__(self, x, enc_output, look_ahead_mask, padding_mask, rng):
-        attn1 = self.mha1(x, x, x, look_ahead_mask) # decoder attention
+        attn1 = self.mha1(x, x, look_ahead_mask)
         attn1 = self.dropout(rng, self.rate, attn1)
         out1 = self.layernorm1(x + attn1)
 
-        attn2 = self.mha2(out1, enc_output, enc_output, padding_mask) # en-decoder self attention
+        attn2 = self.mha2(out1, enc_output, padding_mask)
         attn2 = self.dropout(rng, self.rate, attn2)
         out2 = self.layernorm2(out1 + attn2)
 
         ffn_output = self.ffn(out2)
-        ffn_output = self.dropout(rng, self.rate,ffn_output)
+        ffn_output = self.dropout(rng, self.rate, ffn_output)
         out3 = self.layernorm3(out2 + ffn_output)
 
         return out3
+

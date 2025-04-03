@@ -36,7 +36,8 @@ class avril:
         state_only: bool = True,
         num_layers: int = 2,
         num_heads: int = 1,
-        dff = 28,
+        num_scale: int = 1,
+        dff_ratio: int = 2,
         rate = 0.1,
         seed: int = 41310,
     ):
@@ -75,16 +76,17 @@ class avril:
 
         self.num_layers = num_layers
         self.num_heads = num_heads
-        self.dff = dff 
+        self.num_scale = num_scale
+        self.dff_ratio = dff_ratio
         self.rate = rate
 
         self.e_params = self.encoder.init(
-            self.key, inputs, positions, num_layers, num_heads,dff, rate, self.encoder_o_dim, self.key
+            self.key, inputs, positions, num_layers, num_heads, num_scale, dff_ratio, rate, self.encoder_o_dim, self.key
         )
 
         enc_output = random.normal(self.key, inputs.shape[:-1] + (2,))
         self.q_params = self.q_network.init(
-            self.key, inputs, enc_output, positions, num_layers, num_heads, dff, rate, action_dim, self.key
+            self.key, inputs, positions, enc_output, num_layers, num_heads, num_scale, dff_ratio, rate, action_dim, self.key
         )
 
         self.params = (self.e_params, self.q_params)
@@ -115,8 +117,9 @@ class avril:
                 state,
                 positions,
                 self.num_layers,
-                self.num_heads,
-                self.dff,
+                self.num_heads, 
+                self.num_scale,
+                self.dff_ratio,
                 self.rate,
                 self.encoder_o_dim,
                 self.key
@@ -132,7 +135,8 @@ class avril:
                 positions,
                 self.num_layers,
                 self.num_heads,
-                self.dff,
+                self.num_scale,
+                self.dff_ratio,
                 self.rate,
                 self.encoder_o_dim,
                 self.key
@@ -146,7 +150,8 @@ class avril:
             enc_output,
             self.num_layers,
             self.num_heads,
-            self.dff,
+            self.num_scale,
+            self.dff_ratio,
             self.rate,
             self.a_dim,
             self.key
@@ -187,7 +192,8 @@ class avril:
                 positions[:, :, state_dim, np.newaxis, :],
                 self.num_layers,
                 self.num_heads,
-                self.dff,
+                self.num_scale,
+                self.dff_ratio,
                 self.rate,
                 self.encoder_o_dim,
                 self.key
@@ -217,7 +223,8 @@ class avril:
             positions[:, :, 0, np.newaxis, :],
             self.num_layers,
             self.num_heads,
-            self.dff,
+            self.num_scale,
+            self.dff_ratio,
             self.rate,
             self.a_dim,
             self.key
@@ -237,7 +244,8 @@ class avril:
             positions[:, :, 1, np.newaxis, :],
             self.num_layers,
             self.num_heads,
-            self.dff,
+            self.num_scale,
+            self.dff_ratio,
             self.rate,
             self.a_dim,
             self.key
