@@ -344,6 +344,27 @@ def load_fnid_coords_mapping(who: int):
         coords_fnid = pickle.load(f)
     return coords_fnid
 
+def load_id_month_mapping(who: int):
+    """
+    获取每个id对应的月份
+    """
+    # 读取轨迹数据
+    data_dir = UserDataPart
+    json_path = data_dir + toWhoString(who) + f'/all_traj.json'
+    with open(json_path, 'r') as f:
+        traj_data = json.load(f)
+    
+    # 创建id到月份的映射
+    id_month = {}
+    for tc in traj_data:
+        ids = tc['id_chain']
+        date = str(tc['date'])
+        month = date[:6]
+        for idx in ids:
+            if idx not in id_month:
+                id_month[int(idx)] = month
+    return id_month
+
 def fniidMapper(who: int, id: int):    
     '''
     map the id to fnid

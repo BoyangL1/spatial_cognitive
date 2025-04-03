@@ -14,15 +14,16 @@ from scipy.sparse import csgraph
 from scipy.sparse.linalg import eigsh
 import networkx as nx
 from networkx.algorithms.community import louvain_communities
-from sklearn.cluster import SpectralClustering
+from sklearn.cluster import SpectralClustering, DBSCAN
 from sklearn.metrics import silhouette_score
-
+# from hdbscan import HDBSCAN
+from sklearn.cluster import HDBSCAN
 
 working_directory = os.getcwd()
 working_directory = os.path.abspath('.')
 sys.path.append(working_directory)
 
-from topoMap import clusterLocations, cogTopoGraph, topoResPath
+from Analysis.topoMap import clusterLocations, cogTopoGraph, topoResPath
 import SCBIRL_Global_PE.utils as SIRLU
 
 def trajWeekSubset(who, week_order: int):
@@ -196,6 +197,11 @@ def topoNodeCluster(who, method = 'spectral', optimal='silhouette'):
             labels[cluster_idx] = i
     elif method == 'hdbscan':
         clusterer = HDBSCAN(min_cluster_size=2, min_samples=2, metric='precomputed')
+        disimilarity = 1 - affinity
+        np.fill_diagonal(disimilarity, 0)
+        labels = clusterer.fit_predict(disimilarity)
+    elif method == 'dbscan':
+        clusterer = DBSCAN(eps=1/3, min_samples=2, metric='precomputed')
         disimilarity = 1 - affinity
         np.fill_diagonal(disimilarity, 0)
         labels = clusterer.fit_predict(disimilarity)

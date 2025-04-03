@@ -54,7 +54,7 @@ from kneed import KneeLocator
 from sklearn.cluster import AgglomerativeClustering
 from shapely.geometry import Point
 from geopy.distance import geodesic
-from numba import njit, prange
+from numba import jit, prange
 
 
 def coords2compression(model, coords, depth: int):
@@ -209,91 +209,68 @@ def topoResSave(res, who, date):
     with open(save_dir + f'topo_res_{date:d}.pickle', 'wb') as f:
         pickle.dump(res, f)
 
-@njit
+
+@jit(nopython=True)
 def compute_emd_numba(dist_i, dist_j, cost_matrix):
     """
-    Compute the Earth Mover's Distance (EMD) between two distributions using a greedy algorithm.
-    Args:
-        dist_i (ndarray): First distribution.
-        dist_j (ndarray): Second distribution.
-        cost_matrix (ndarray): Precomputed cost matrix.
-    Returns:
-        float: The EMD (Wasserstein distance) between the two distributions.
+    使用 Numba 实现的简化版 EMD 算法
+    基于线性规划求解最优传输问题
     """
-    remaining_mass_i = dist_i.copy()
-    remaining_mass_j = dist_j.copy()
-    total_cost = 0.0
-
-    for k in range(len(cost_matrix)):
-        min_mass = min(remaining_mass_i[k], remaining_mass_j[k])
-        total_cost += min_mass * cost_matrix[k, k]
-        remaining_mass_i[k] -= min_mass
-        remaining_mass_j[k] -= min_mass
-
+    n = len(dist_i)
+    if np.isnan(dist_i).all() or np.isnan(dist_j).all():
+        return np.inf
+    
+    # 确保输入是概率分布
+    dist_i = dist_i / np.sum(dist_i)
+    dist_j = dist_j / np.sum(dist_j)
+    
+    # 初始化传输矩阵
+    transport_matrix = np.zeros((n, n))
+    
+    # 贪心算法求解（简化版）
+    # 1. 找到成本最小的位置
+    # 2. 尽可能多地传输
+    # 3. 更新剩余需求和供应
+    remaining_i = dist_i.copy()
+    remaining_j = dist_j.copy()
+    
+    while np.sum(remaining_i) > 1e-10 and np.sum(remaining_j) > 1e-10:
+        # 找到最小成本的位置
+        min_cost = np.inf
+        min_i, min_j = 0, 0
+        for i in range(n):
+            for j in range(n):
+                if remaining_i[i] > 1e-10 and remaining_j[j] > 1e-10:
+                    if cost_matrix[i, j] < min_cost:
+                        min_cost = cost_matrix[i, j]
+                        min_i, min_j = i, j
+        
+        # 传输尽可能多的量
+        amount = min(remaining_i[min_i], remaining_j[min_j])
+        transport_matrix[min_i, min_j] = amount
+        remaining_i[min_i] -= amount
+        remaining_j[min_j] -= amount
+    
+    # 计算总成本
+    total_cost = np.sum(transport_matrix * cost_matrix)
     return total_cost
 
 
-@njit(parallel=True)
-def compute_circ_wasserstein_numba(angular_distribution, angular_cost):
+@jit(nopython=True, parallel=True)
+def compute_wasserstein_matrix_numba(distribution_array, cost_matrix):
     """
-    使用numba加速的圆周Wasserstein距离计算
-    
-    参数:
-    angular_distribution: shape (n, 96) 的数组，表示n个位置的时间分布
-    angular_cost: shape (96, 96) 的数组，表示时间槽之间的成本矩阵
-    
-    返回:
-    wasserstein_matrix: shape (n, n) 的数组，表示位置对之间的Wasserstein距离
+    使用 Numba 优化的 Wasserstein 距离矩阵计算
     """
-    n = angular_distribution.shape[0]
-    wasserstein_matrix = np.zeros((n, n))
+    n = len(distribution_array)
+    result = np.zeros((n, n))
     
-    # 对每对位置计算Wasserstein距离
     for i in prange(n):
-        for j in range(i+1, n):
-            # 获取两个位置的时间分布
-            dist_i = angular_distribution[i]
-            dist_j = angular_distribution[j]
-            
-            # Skip if either distribution is invalid
-            if np.isnan(dist_i).all() or np.isnan(dist_j).all():
-                wasserstein_matrix[i, j] = np.inf
-                continue
-            
-            wasserstein_matrix[i, j] = compute_emd_numba(dist_i, dist_j, angular_cost)
+        for j in range(i + 1, n):
+            dist_i = distribution_array[i]
+            dist_j = distribution_array[j]
+            result[i, j] = compute_emd_numba(dist_i, dist_j, cost_matrix)
     
-    wasserstein_matrix += wasserstein_matrix.T
-    return wasserstein_matrix
-
-@njit(parallel=True)
-def compute_hd_wasserstein_Numba(transition_probs, cost_matrix):
-    """
-    Compute the Wasserstein distance matrix using a greedy algorithm.
-    Args:
-        transition_probs (ndarray): Transition probability matrix.
-        cost_matrix (ndarray): Precomputed cost matrix (spatial distance matrix).
-    Returns:
-        ndarray: Wasserstein distance matrix.
-    """
-    num_locs = len(transition_probs)
-    wasserstein_matrix = np.zeros((num_locs, num_locs))
-
-    for i in prange(num_locs):
-        for j in range(i + 1, num_locs):
-            dist_i = transition_probs[i]
-            dist_j = transition_probs[j]
-
-            # Skip if either distribution is invalid
-            if np.isnan(dist_i).all() or np.isnan(dist_j).all():
-                wasserstein_matrix[i, j] = np.inf
-                continue
-
-            # Use the compute_emd_numba function to calculate EMD
-            wasserstein_matrix[i, j] = compute_emd_numba(dist_i, dist_j, cost_matrix)
-
-    # Symmetrize the matrix
-    wasserstein_matrix += wasserstein_matrix.T
-    return wasserstein_matrix
+    return result + result.T
 
 
 def clusterLocations(who, date, res_save=True):
@@ -350,7 +327,7 @@ def clusterLocations(who, date, res_save=True):
     # print("Spatial distance computation finished.")
 
     # Compute Wasserstein distance matrix using Numba
-    social_dist = compute_hd_wasserstein_Numba(transitionProbsEdit, spatial_cost)
+    social_dist = compute_wasserstein_matrix_numba(transitionProbsEdit, spatial_dist)
     logging.info("Social distance computation finished.")
 
     # Compute the temporal distribution
@@ -361,7 +338,7 @@ def clusterLocations(who, date, res_save=True):
     for i in range(slot_num):
         angular_cost[i] = np.roll(init_cost, i)
     angular_cost /= 4
-    temporal_dist = compute_circ_wasserstein_numba(angular_distribution, angular_cost)
+    temporal_dist = compute_wasserstein_matrix_numba(angular_distribution, angular_cost)
     logging.info("Temporal distance computation finished.")
     
     # compute the total matrix
@@ -371,7 +348,6 @@ def clusterLocations(who, date, res_save=True):
     bandwidth_in_kilometers = 1.0
     
     # standardize the social distance matrix to fit standard log-normal distribution
-    social_dist = positive_smooth(social_dist)
     social_dist_upper = social_dist[np.triu_indices_from(social_dist, k=1)]
     log_social_dist = np.log(social_dist_upper)
     log_mean = np.mean(log_social_dist)
@@ -383,6 +359,9 @@ def clusterLocations(who, date, res_save=True):
     social_dist_standard = np.zeros_like(social_dist)
     social_dist_standard[np.triu_indices_from(social_dist, k=1)] = social_dist_upper_scaled
     social_dist_standard += social_dist_standard.T  # 保持对称性
+    
+    social_dist_standard = positive_smooth(social_dist_standard)
+    temporal_dist = positive_smooth(temporal_dist)
     
     # spatial similarity is computed by a gaussian kernel
     spatial_similarity = np.exp(-spatial_dist ** 2 / (2 * bandwidth_in_kilometers ** 2))
@@ -407,9 +386,11 @@ def clusterLocations(who, date, res_save=True):
     dist_threshold = 1 / (sim_threshold)
     # clustering the locations by agglomerative clustering
     aggClusterer = AgglomerativeClustering(None, metric='precomputed', 
-                                          distance_threshold=dist_threshold, linkage='average')
+                                          distance_threshold=dist_threshold, 
+                                          linkage='average')
     total_dist = 1 / (total_similarity / total_sim_max)
     np.fill_diagonal(total_dist, 0)
+    total_dist = np.minimum(total_dist, total_dist[~np.isinf(total_dist)].max())
     aggClusterer.fit(total_dist)
     
     # get the cluster labels
@@ -585,10 +566,11 @@ def cogTopoGraph(who, date):
 
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
+    
     model_dir = "./model/"
     save_dir = "./product/topoMap/"
-    user_list = [name for name in os.listdir(model_dir) if name.isdigit()]
-    user_list = user_list[:1]
+    # user_list = [name for name in os.listdir(model_dir) if name.isdigit()]
     res_dict = dict()
     for user in user_list:
         user_int = int(user)
@@ -602,3 +584,5 @@ if __name__ == '__main__':
             # res_dict[(user, date)] = res
             # with open(save_dir + f'topo_cluster.pkl', 'wb') as f:
             #     pickle.dump(res_dict, f)
+
+
