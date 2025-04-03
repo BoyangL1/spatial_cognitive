@@ -1,8 +1,9 @@
 import haiku as hk
 import jax
 import jax.numpy as np
+from .gridAttn import GridCellPositionalEncoding
 
-class MultiHeadSelfAttention(hk.Module):
+class MultiHeadSelfGridAttention(hk.Module):
     def __init__(self, d_model, num_heads):
         super().__init__()
         self.d_model = d_model
@@ -12,8 +13,13 @@ class MultiHeadSelfAttention(hk.Module):
         self.wq = hk.Linear(self.d_model)
         self.wk = hk.Linear(self.d_model)
         self.wv = hk.Linear(self.d_model)
-
         self.dense = hk.Linear(self.d_model)
+        
+        self.grid_pe = GridCellPositionalEncoding(
+            dimension=2,
+            qk_dim=d_model,
+            num_heads=num_heads
+        )
 
     def split_heads(self, x, batch_size):
         x = x.reshape(batch_size, -1, self.num_heads, self.depth)
@@ -21,17 +27,14 @@ class MultiHeadSelfAttention(hk.Module):
 
     def attention(self, query, key, value):
         matmul_qk = np.matmul(query, key.transpose(0, 1, 3, 2))
-
         dk = np.float32(self.depth)
         scaled_attention_logits = matmul_qk / np.sqrt(dk)
-
         attention_weights = jax.nn.softmax(scaled_attention_logits, axis=-1)
-
         output = np.matmul(attention_weights, value)
         return output, attention_weights
 
-    def __call__(self, x):
-        batch_size, seq_len, _ , _ = x.shape
+    def __call__(self, x, positions, rng):
+        batch_size, seq_len, _, _ = x.shape
 
         query = self.wq(x)
         key = self.wk(x)
@@ -41,11 +44,12 @@ class MultiHeadSelfAttention(hk.Module):
         key = self.split_heads(key, batch_size)
         value = self.split_heads(value, batch_size)
 
-        attention, _ = self.attention(query, key, value)
+        # 应用网格细胞位置编码
+        query_rot, key_rot = self.grid_pe(positions, query, key, rng)
 
+        attention, _ = self.attention(query_rot, key_rot, value)
         attention = attention.transpose(0, 2, 1, 3)
         concat_attention = attention.reshape(batch_size, seq_len, -1, self.d_model)
-
         output = self.dense(concat_attention)
         return output
 
@@ -64,25 +68,22 @@ class PointWiseFeedForwardNetwork(hk.Module):
 class TransformerLayer(hk.Module):
     def __init__(self, d_model, num_heads, dff, rate=0.1):
         super().__init__()
-        self.mha = MultiHeadSelfAttention(d_model, num_heads)
+        self.mha = MultiHeadSelfGridAttention(d_model, num_heads)
         self.ffn = PointWiseFeedForwardNetwork(d_model, dff)
-
         self.layernorm1 = hk.LayerNorm(axis=-1, create_scale=True, create_offset=True)
         self.layernorm2 = hk.LayerNorm(axis=-1, create_scale=True, create_offset=True)
-
         self.dropout = hk.dropout
-
         self.rate = rate
 
-    def __call__(self, x, rng):
-        attn_rng, ffn_rng = jax.random.split(rng)  
-
-        attn_output = self.mha(x)
-        attn_output = hk.dropout(attn_rng, self.rate, attn_output)  
+    def __call__(self, x, positions, rng):
+        attn_rng, ffn_rng = jax.random.split(rng)
+        
+        attn_output = self.mha(x, positions, attn_rng)
+        attn_output = self.dropout(attn_rng, self.rate, attn_output)
         out1 = self.layernorm1(x + attn_output)
 
         ffn_output = self.ffn(out1)
-        ffn_output = hk.dropout(ffn_rng, self.rate, ffn_output)  
+        ffn_output = self.dropout(ffn_rng, self.rate, ffn_output)
         out2 = self.layernorm2(out1 + ffn_output)
 
         return out2

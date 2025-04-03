@@ -97,12 +97,12 @@ def processTrajectoryData(traj_chains, state_attribute, s_dim):
         tuple: A tuple containing three arrays:
             - state_next_state (ndarray): Array of shape (num_chains, max_traj_len, 2, s_dim) representing the current and next states.
             - action_next_action (ndarray): Array of shape (num_chains, max_traj_len, 2, 1) representing the current and next actions.
-            - pe_next_pe (ndarray): Array of shape (num_chains, max_traj_len, 2, nlevel*3) representing the current and next grid codes.
+            - positions_next_positions (ndarray): Array of shape (num_chains, max_traj_len, 2, 2) representing the current and next coordinates.
 
     """
     state_next_state = []
     action_next_action = []
-    pe_next_pe = []
+    positions_next_positions = [] 
 
     for tc in traj_chains:
         sns_chain, ana_chain, pnp_chain = [], [], []
@@ -120,15 +120,15 @@ def processTrajectoryData(traj_chains, state_attribute, s_dim):
             pnp_chain.append(p_n_p)
         state_next_state.append(sns_chain)
         action_next_action.append(ana_chain)
-        pe_next_pe.append(pnp_chain)
+        positions_next_positions.append(pnp_chain)
     # pad sequence to the same length
     # 把traj_len填充到最大的长度，变为max_traj_len, 其余值默认为-999填充
     # todo: 考虑是否要长度对齐
     state_next_state = padSequences(state_next_state,s_n_s.shape) 
     action_next_action = padSequences(action_next_action,a_n_a.shape,padding_value=-1)
-    pe_next_pe = padSequences(pe_next_pe,p_n_p.shape)
+    positions_next_positions = padSequences(positions_next_positions,p_n_p.shape)
 
-    return np.array(state_next_state), np.array(action_next_action), np.array(pe_next_pe)
+    return np.array(state_next_state), np.array(action_next_action), np.array(positions_next_positions)
 
 def processSingleTrajectory(tc, t, state_attribute, s_dim):
     '''
@@ -136,48 +136,40 @@ def processSingleTrajectory(tc, t, state_attribute, s_dim):
     in order to form the TD training array.
     '''
     if t < len(tc.travel_chain)-1:
-        this_state, next_state = tc.travel_chain[t], tc.travel_chain[t + 1]
+        this_coord, next_coord = tc.travel_chain[t], tc.travel_chain[t + 1]
         this_fnid, next_fnid = tc.fnid_chain[t], tc.fnid_chain[t+1]
         # state attribute
         s_n_s = onp.zeros((2, s_dim))
         s_n_s[0, :] = getStateRow(state_attribute, this_fnid)
         s_n_s[1, :] = getStateRow(state_attribute, next_fnid)
 
-        # note: 这一块和之前cann版本代码不同
-        # get global positional encoding of state
-        this_pe = globalPE(this_state,s_dim)
-        next_pe = globalPE(next_state,s_dim)
-        # save to s_grid_s
-        s_pe_s = onp.empty((2, s_dim*3), dtype=onp.complex_) # Each dimensional grid encoding has three component
-        s_pe_s[0, :] = this_pe.flatten()
-        s_pe_s[1, :] = next_pe.flatten()
+        # 位置信息：直接使用经纬度
+        p_n_p = onp.zeros((2, 2))  # [2, 2] 表示 [当前/下一个, [lat, lon]]
+        p_n_p[0] = this_coord  # this_state应该是[lat, lon]格式
+        p_n_p[1] = next_coord
 
         # action
         a_n_a = onp.zeros((2, 1))   
         a_n_a[0] = tc.id_chain[t + 1]
         a_n_a[1] = tc.id_chain[t + 2] if t + 2 < len(tc.id_chain) else -1
     else:
-        this_state, next_state = tc.travel_chain[t], None
-        this_fnid, next_fnid = tc.fnid_chain[t], None
+        # 处理序列末尾
+        this_fnid = tc.fnid_chain[t]
+        this_coord = tc.travel_chain[t]
         s_n_s = onp.zeros((2, s_dim))
         s_n_s[0, :] = getStateRow(state_attribute, this_fnid)
         # the latter position is filled with padding value
         s_n_s[1, :] = Padding
 
-        # get grid code of state and destination,dim(8,128,128)
-        this_pe = globalPE(this_state,s_dim)
-        # next_pe = onp.zeros_like(this_pe)
-        # save to s_grid_s
-        s_pe_s = onp.empty((2, s_dim*3), dtype=onp.complex_)
-        s_pe_s[0, :] = this_pe.flatten()
-        # s_pe_s[1, :] = next_pe.flatten()
-        s_pe_s[1, :] = Padding
-        
+        p_n_p = onp.zeros((2, 2))
+        p_n_p[0] = this_coord
+        p_n_p[1] = Padding
+
         a_n_a = onp.zeros((2, 1))
         a_n_a[0] = -1
         a_n_a[1] = -1
 
-    return s_n_s, a_n_a, s_pe_s
+    return s_n_s, a_n_a, p_n_p
 
 def padSequences(data_list, element_shape, padding_value=Padding):
     """

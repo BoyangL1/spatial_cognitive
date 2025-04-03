@@ -30,7 +30,7 @@ class avril:
         self,
         inputs: np.array,
         targets: np.array,
-        pe_code: np.array,
+        positions: np.array,
         state_dim: int,
         action_dim: int,
         state_only: bool = True,
@@ -48,8 +48,8 @@ class avril:
             State training data of size [num_traj x npair_per_traj x 2 x state_dimension]
         targets: np.array
             Action training data of size [num_traj x npair_per_traj x 2 x 1]
-        pe_code: np.array
-            Grid code data of size [num_traj x npair_per_traj x 2 x position_embedding_dim]
+        positions: np.array
+            Grid code data of size [num_traj x npair_per_traj x 2 x position_dim]
         state_dim: int
             Dimension of state space
         action_dim: int
@@ -64,11 +64,10 @@ class avril:
 
         self.encoder = hk.transform(encoder_model)
         self.q_network = hk.transform(q_network_model)
-        self.compress_pe_code_complex = hk.transform(compress_pe_code_complex)
 
         self.inputs = inputs
         self.targets = targets
-        self.pe_code = pe_code
+        self.positions = positions
         self.s_dim = state_dim
         self.a_dim = action_dim
         self.state_only = state_only
@@ -80,19 +79,15 @@ class avril:
         self.rate = rate
 
         self.e_params = self.encoder.init(
-            self.key, inputs, pe_code, num_layers, num_heads,dff, rate, self.encoder_o_dim, self.key
+            self.key, inputs, positions, num_layers, num_heads,dff, rate, self.encoder_o_dim, self.key
         )
 
         enc_output = random.normal(self.key, inputs.shape[:-1] + (2,))
         self.q_params = self.q_network.init(
-            self.key, inputs, enc_output, pe_code, num_layers, num_heads, dff, rate, action_dim, self.key
+            self.key, inputs, enc_output, positions, num_layers, num_heads, dff, rate, action_dim, self.key
         )
 
-        self.c_params = self.compress_pe_code_complex.init(
-            self.key,pe_code,inputs.shape[-1]
-        )
-
-        self.params = (self.e_params, self.q_params, self.c_params)
+        self.params = (self.e_params, self.q_params)
 
         self.load_params = False
         self.pre_params = None
@@ -111,15 +106,14 @@ class avril:
             self.pre_params = self.params
             self.e_params = self.params[0]
             self.q_params = self.params[1]
-            self.c_params = self.params[2]
 
-    def reward(self,state,pe_code):
-        #  Returns reward function parameters for a given state
+    def reward(self,state,positions):
+        #  Returns reward function parameters for a given state
         r_par = self.encoder.apply(
                 self.e_params,
                 self.key,
                 state,
-                pe_code,
+                positions,
                 self.num_layers,
                 self.num_heads,
                 self.dff,
@@ -130,12 +124,12 @@ class avril:
         r_par = np.squeeze(r_par,axis = 2)
         return r_par
     
-    def QValue(self,state,pe_code):
+    def QValue(self,state,positions):
         enc_output = self.encoder.apply(
                 self.e_params,
                 self.key,
                 state,
-                pe_code,
+                positions,
                 self.num_layers,
                 self.num_heads,
                 self.dff,
@@ -148,8 +142,8 @@ class avril:
             self.q_params,
             self.key,
             state,
+            positions,
             enc_output,
-            pe_code,
             self.num_layers,
             self.num_heads,
             self.dff,
@@ -160,7 +154,7 @@ class avril:
         q_values = np.squeeze(q_values,axis=2)
         return q_values
 
-    def elbo(self, params, key, inputs, targets, pe_code, weights = None):
+    def elbo(self, params, key, inputs, targets, positions, weights = None):
         """
         Method for calculating ELBO
 
@@ -190,7 +184,7 @@ class avril:
                 encoder_params,
                 key,
                 inputs[:, :, state_dim, np.newaxis, :],
-                pe_code[:, :, state_dim, np.newaxis, :],
+                positions[:, :, state_dim, np.newaxis, :],
                 self.num_layers,
                 self.num_heads,
                 self.dff,
@@ -209,7 +203,7 @@ class avril:
             return means, log_sds, r_par0
         
         # get neural network's parameters
-        e_params, q_params, _ = params
+        e_params, q_params = params
         
         # calculate the kl difference between current reward and pre reward 
         means, log_sds, enc_output = getRewardParameters(e_params, 0)
@@ -220,7 +214,7 @@ class avril:
             key,
             inputs[:, :, 0, np.newaxis, :],
             enc_output,
-            pe_code[:, :, 0, np.newaxis, :],
+            positions[:, :, 0, np.newaxis, :],
             self.num_layers,
             self.num_heads,
             self.dff,
@@ -240,7 +234,7 @@ class avril:
             key,
             inputs[:, :, 1, np.newaxis, :],
             enc_output1,
-            pe_code[:, :, 1, np.newaxis, :],
+            positions[:, :, 1, np.newaxis, :],
             self.num_layers,
             self.num_heads,
             self.dff,
@@ -265,7 +259,7 @@ class avril:
 
         if self.load_params:
             # 有先验迭代
-            e_params_pre, _, _ = self.pre_params
+            e_params_pre, _ = self.pre_params
             means_pre, log_sds_pre , _ = getRewardParameters(e_params_pre, 0)
             kl = kl_divergence(means, np.exp(log_sds), means_pre, np.exp(log_sds_pre))
         else:
@@ -312,7 +306,7 @@ class avril:
 
         inputs = self.inputs
         targets = self.targets
-        pe_code = self.pe_code
+        positions = self.positions
         if weights is not None:
             weights_array = np.array(weights)
         
@@ -349,7 +343,7 @@ class avril:
             if weights is not None:
                 weights = weights_array[indexs]
 
-            lik, g_params = loss_grad(params, key, inputs[indexs], targets[indexs], pe_code[indexs], weights = weights)
+            lik, g_params = loss_grad(params, key, inputs[indexs], targets[indexs], positions[indexs], weights = weights)
 
             loss_diff = abs(lik-lik_pre)
             print(lik-lik_pre, lik)
@@ -364,5 +358,4 @@ class avril:
 
         self.e_params = params[0]
         self.q_params = params[1]
-        self.c_params = params[2]
         self.params = params
