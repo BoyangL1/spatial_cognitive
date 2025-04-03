@@ -81,12 +81,14 @@ class avril:
         self.rate = rate
 
         self.e_params = self.encoder.init(
-            self.key, inputs, positions, num_layers, num_heads, num_scale, dff_ratio, rate, self.encoder_o_dim, self.key
+            self.key, 
+            inputs, positions, num_layers, num_heads, num_scale, dff_ratio, rate, self.encoder_o_dim, self.key
         )
 
         enc_output = random.normal(self.key, inputs.shape[:-1] + (2,))
         self.q_params = self.q_network.init(
-            self.key, inputs, positions, enc_output, num_layers, num_heads, num_scale, dff_ratio, rate, action_dim, self.key
+            self.key, 
+            inputs, positions, enc_output, num_layers, num_heads, num_scale, dff_ratio, rate, action_dim, self.key
         )
 
         self.params = (self.e_params, self.q_params)

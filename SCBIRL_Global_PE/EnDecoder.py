@@ -1,6 +1,7 @@
 import haiku as hk
 
 import jax.numpy as np
+import jax
 
 from .transformer import *
 
@@ -38,11 +39,11 @@ def encoder_model(inputs, positions, num_layers, num_heads, num_scale, dff_ratio
     x = feature_embedding_layer(inputs)
     
     # 第一层使用带旋转的Transformer
-    transformer_layers = [TransformerLayer(feature_embedding_layer, num_heads, dff_ratio, use_rotation=True, rate=rate)]
+    transformer_layers = [TransformerLayer(embedding_dim, num_heads, dff_ratio, use_rotation=True, rate=rate)]
     
     # 后续层使用不带旋转的Transformer
     transformer_layers.extend([
-        TransformerLayer(feature_embedding_layer, num_heads, dff_ratio, rate)
+        TransformerLayer(embedding_dim, num_heads, dff_ratio, rate)
         for _ in range(num_layers - 1)
     ])
     
@@ -54,7 +55,7 @@ def encoder_model(inputs, positions, num_layers, num_heads, num_scale, dff_ratio
 
 def create_look_ahead_mask(size):
     mask = np.triu(np.ones((size, size)), k=1)
-    mask = mask[np.newaxis, np.newaxis, ...]
+    mask = mask[np.newaxis, np.newaxis, ...]  # [1, 1, size, size]
     return mask
 
 def q_network_model(inputs, positions, enc_output, num_layers, num_heads, num_scale, dff_ratio, rate, output_dim, rng):
@@ -70,7 +71,8 @@ def q_network_model(inputs, positions, enc_output, num_layers, num_heads, num_sc
     x = feature_embedding_layer(inputs)
     
     # 第一层使用带旋转的Transformer
-    transformer_decoder_layers = [TransformerDecoderLayer(embedding_dim, num_heads, dff_ratio, use_rotation=True, rate=rate)]
+    transformer_decoder_layers = [
+        TransformerDecoderLayer(embedding_dim, num_heads, dff_ratio, use_rotation=True, rate=rate)]
     
     # 后续层使用不带旋转的Transformer
     transformer_decoder_layers.extend([
@@ -78,7 +80,7 @@ def q_network_model(inputs, positions, enc_output, num_layers, num_heads, num_sc
         for _ in range(num_layers - 1)
     ])
     
-    look_ahead_mask = create_look_ahead_mask(inputs.shape[1]*inputs.shape[2]) # ? which one?
+    look_ahead_mask = create_look_ahead_mask(inputs.shape[1]*inputs.shape[2]) 
     
     for layer in transformer_decoder_layers:
         x = layer(x, positions, enc_output, look_ahead_mask, None, rng)
