@@ -278,7 +278,7 @@ def plugInDataPair(tc, stateAttribute, model, visitedState):
     # Set model inputs for training or evaluation
     model.inputs = stateNextState
     model.targets = actionNextAction
-    model.pe_code = peNextpe
+    model.positions = peNextpe
 
 
 def toWhoString(who: int, digits=9):
