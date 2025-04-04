@@ -1,21 +1,21 @@
-import haiku as hk
+if __name__ == "__main__" and __package__ is None:
+    import sys
+    from pathlib import Path
+    sys.path.append(str(Path(__file__).resolve().parent.parent))
+    __package__ = "SCBIRL_Global_PE"
+    
+import pickle
+import numpy as onp
 
-from jax import grad, jit, value_and_grad
-from jax import random
-from jax.example_libraries import optimizers
+import haiku as hk
 import jax
 import jax.numpy as np
-from jax import random
-
-import numpy as onp
-import pickle
-import os
-import pandas as pd
+from jax import jit, value_and_grad, random
+from jax.example_libraries import optimizers
 from tqdm import tqdm
-from sklearn.preprocessing import MinMaxScaler
 
-from .transformer import *
 from .EnDecoder import *
+from .transformer import *
 from .utils import *
 from .migrationProcess import *
 
@@ -369,3 +369,40 @@ class avril:
         self.e_params = params[0]
         self.q_params = params[1]
         self.params = params
+
+if __name__ == "__main__":
+    # 模拟超参数
+    num_traj = 10
+    npair_per_traj = 5
+    state_dim = 10
+    action_dim = 3
+    position_dim = 2
+
+    # 构造假数据（随机）
+    inputs = onp.random.randn(num_traj, npair_per_traj, 2, state_dim).astype(onp.float32)
+    targets = onp.random.randint(0, action_dim, size=(num_traj, npair_per_traj, 2, 1)).astype(onp.float32)
+    positions = onp.random.randn(num_traj, npair_per_traj, 2, position_dim).astype(onp.float32)
+
+    # 转为 JAX 数组
+    inputs = np.array(inputs)
+    targets = np.array(targets)
+    positions = np.array(positions)
+
+    # 初始化模型
+    model = avril(inputs, targets, positions, state_dim, action_dim)
+
+    # 训练模型
+    print("Training model on synthetic data...")
+    model.train(iters=200, batch_size=4)
+
+    # 测试 reward 输出
+    test_state = inputs[:1, :, 0, :]  # 一个轨迹的第一个状态序列
+    test_pos = positions[:1, :, 0, :]
+    r = model.reward(test_state, test_pos)
+    print("\nSample reward output shape:", r.shape)
+    print("Sample reward output:", r)
+
+    # 测试 Q 值输出
+    q = model.QValue(test_state, test_pos)
+    print("\nSample Q-value output shape:", q.shape)
+    print("Sample Q-value output:", q)

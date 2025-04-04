@@ -38,14 +38,8 @@ def encoder_model(inputs, positions, num_layers, num_heads, num_scale, dff_ratio
     feature_embedding_layer = hk.Linear(embedding_dim)
     x = feature_embedding_layer(inputs)
     
-    # 第一层使用带旋转的Transformer
-    transformer_layers = [TransformerLayer(embedding_dim, num_heads, dff_ratio, use_rotation=True, rate=rate)]
-    
-    # 后续层使用不带旋转的Transformer
-    transformer_layers.extend([
-        TransformerLayer(embedding_dim, num_heads, dff_ratio, rate)
-        for _ in range(num_layers - 1)
-    ])
+    transformer_layers = [TransformerLayer(embedding_dim, num_heads, dff_ratio, rate) 
+                        for _ in range(num_layers)]
     
     for layer in transformer_layers:
         x = layer(x, positions, rng)
@@ -70,20 +64,13 @@ def q_network_model(inputs, positions, enc_output, num_layers, num_heads, num_sc
     feature_embedding_layer = hk.Linear(embedding_dim)
     x = feature_embedding_layer(inputs)
     
-    # 第一层使用带旋转的Transformer
-    transformer_decoder_layers = [
-        TransformerDecoderLayer(embedding_dim, num_heads, dff_ratio, use_rotation=True, rate=rate)]
-    
-    # 后续层使用不带旋转的Transformer
-    transformer_decoder_layers.extend([
-        TransformerDecoderLayer(embedding_dim, num_heads, dff_ratio, rate)
-        for _ in range(num_layers - 1)
-    ])
+    transformer_decoder_layers = [TransformerDecoderLayer(embedding_dim, num_heads, dff_ratio, use_rotation=True, rate=rate) 
+                                for _ in range(num_layers)]
     
     look_ahead_mask = create_look_ahead_mask(inputs.shape[1]*inputs.shape[2]) 
     
     for layer in transformer_decoder_layers:
-        x = layer(x, positions, enc_output, look_ahead_mask, None, rng)
+        x = layer(x, enc_output, look_ahead_mask, None, positions, rng)
 
     final_layer = hk.Linear(output_dim)
     return final_layer(x)
