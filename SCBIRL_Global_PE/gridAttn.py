@@ -56,7 +56,7 @@ class GridCellPositionalEncoding(hk.Module):
         for i in range(self.num_heads):
             subkey = random.fold_in(key, i)
             omega = self._generate_simplex_vectors_with_projection(self.dimension, subkey)
-            theta = np.einsum('bsd,nd->bsn', positions, omega)[:, :, :, None] * mag.T # (B, N, n, 1) * (1, S)
+            theta = np.einsum('bsd,nd->bsn', positions, omega)[..., None] * mag.T # (B, N, n, 1) * (1, S)
             theta_heads.append(theta)
         theta_heads = np.stack(theta_heads, axis=0)
         theta_heads = np.transpose(theta_heads, (1, 0, 2, 3, 4))
@@ -111,7 +111,7 @@ class GridCellPositionalEncoding(hk.Module):
 
         Parameters:
         - positions: (batch_size, seq_length, d) tensor, input position vectors.
-        - q: (batch_size,  num_heads, seq_length, 2nS) tensor, input token embeddings.
+        - q: (batch_size, num_heads, seq_length, 2nS) tensor, input token embeddings.
 
         Returns:
         - q(k)_rotated: (batch_size, num_heads, seq_length, 2nS) tensor, output after transformation.
@@ -212,8 +212,6 @@ class GridPEAttention(hk.Module):
 if __name__ == '__main__':
     import jax.numpy as np
     import haiku as hk
-
-    torch.manual_seed(42)
 
     # Parameters
     dimension = 2

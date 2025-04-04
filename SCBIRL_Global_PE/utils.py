@@ -258,11 +258,11 @@ def loadTrajChain(user_path, type: str, start_date=None):
     full_feature_path = user_path + 'all_traj_feature.csv'
     state_attribute, s_dim = preprocessStateAttributes(full_feature_path)
     # 注意，这里建成环境做了归一化，但是位置编码是没有的
-    state_next_state, action_next_action, grid_next_grid= processTrajectoryData(chains_loaded, state_attribute, s_dim)
+    state_next_state, action_next_action, positions_next_positions = processTrajectoryData(chains_loaded, state_attribute, s_dim)
     # 这里的state_next_state是一个四维数组，第一维是轨迹条数，第二维是轨迹最大长度（即每条轨迹pair数），第三维是状态数（2），第四维是特征数
     # action_next_action是一个四维数组，第一维是轨迹条数，第二维是轨迹最大长度（即每条轨迹pair数），第三维是状态数（2），第四维是虚假轴
     # 第三个输出grid_next_grid是四维数组, dim(num_traj, max_traj_len, 2, nlevel)
-    return state_next_state, action_next_action, grid_next_grid, a_dim, s_dim
+    return state_next_state, action_next_action, positions_next_positions, a_dim, s_dim
     
 def plugInDataPair(tc, stateAttribute, model, visitedState):
     ''' 

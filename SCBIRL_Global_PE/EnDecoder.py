@@ -1,6 +1,7 @@
 import haiku as hk
 
 import jax.numpy as np
+import jax
 
 from .transformer import *
 
@@ -25,41 +26,62 @@ def compress_pe_code_complex(pe_code, target_dim):
     return pe_real_compressed,pe_imag_compressed
 
 
-def encoder_model(inputs, positions, num_layers, num_heads, dff, rate, output_dim, rng):
+def encoder_model(inputs, positions, num_layers, num_heads, num_scale, dff_ratio, rate, output_dim, rng):
     """
-    inputs: 输入特征
+    inputs: 输入特征 [batch_size, seq_len, 2, 10]
     positions: 经纬度坐标 [batch_size, seq_len, 2, 2]
     """
-    # 删除原来的位置编码压缩步骤
-    # 直接使用transformer层
-    transformer_layers = [TransformerLayer(inputs.shape[-1], num_heads, dff, rate) 
-                        for _ in range(num_layers)]
+    # 升维层：将10维特征升维到144维
+    # 提取position最后一个维度的维数
+    position_dim = positions.shape[-1]
+    embedding_dim = 2 * (position_dim + 1) * num_scale * num_heads
+    feature_embedding_layer = hk.Linear(embedding_dim)
+    x = feature_embedding_layer(inputs)
     
-    x = inputs
+    # 第一层使用带旋转的Transformer
+    transformer_layers = [TransformerLayer(embedding_dim, num_heads, dff_ratio, use_rotation=True, rate=rate)]
+    
+    # 后续层使用不带旋转的Transformer
+    transformer_layers.extend([
+        TransformerLayer(embedding_dim, num_heads, dff_ratio, rate)
+        for _ in range(num_layers - 1)
+    ])
+    
     for layer in transformer_layers:
-        x = layer(x, positions, rng)  # transformer层会使用GridCellPositionalEncoding
+        x = layer(x, positions, rng)
 
     final_layer = hk.Linear(output_dim)
     return final_layer(x)
 
 def create_look_ahead_mask(size):
     mask = np.triu(np.ones((size, size)), k=1)
-    mask = mask[np.newaxis, np.newaxis, ...]
+    mask = mask[np.newaxis, np.newaxis, ...]  # [1, 1, size, size]
     return mask
 
-def q_network_model(inputs, positions, enc_output, num_layers, num_heads, dff, rate, output_dim, rng):
+def q_network_model(inputs, positions, enc_output, num_layers, num_heads, num_scale, dff_ratio, rate, output_dim, rng):
     """
-    inputs: 输入特征
-    positions: 经纬度坐标 [batch_size, seq_len, 2]
+    inputs: 输入特征 [batch_size, seq_len, 2, 10]
+    positions: 经纬度坐标 [batch_size, seq_len, 2, 2]
     """
-    # 初始化transformer decoder层
-    transformer_decoder_layers = [TransformerDecoderLayer(inputs.shape[-1], num_heads, dff, rate) 
-                                for _ in range(num_layers)]
+    # 升维层：将10维特征升维到144维
+    # 提取position最后一个维度的维数
+    position_dim = positions.shape[-1]
+    embedding_dim = 2 * (position_dim + 1) * num_scale * num_heads
+    feature_embedding_layer = hk.Linear(embedding_dim)
+    x = feature_embedding_layer(inputs)
     
-    look_ahead_mask = create_look_ahead_mask(inputs.shape[1]*inputs.shape[2])
+    # 第一层使用带旋转的Transformer
+    transformer_decoder_layers = [
+        TransformerDecoderLayer(embedding_dim, num_heads, dff_ratio, use_rotation=True, rate=rate)]
     
-    # forward pass
-    x = inputs
+    # 后续层使用不带旋转的Transformer
+    transformer_decoder_layers.extend([
+        TransformerDecoderLayer(embedding_dim, num_heads, dff_ratio, rate)
+        for _ in range(num_layers - 1)
+    ])
+    
+    look_ahead_mask = create_look_ahead_mask(inputs.shape[1]*inputs.shape[2]) 
+    
     for layer in transformer_decoder_layers:
         x = layer(x, positions, enc_output, look_ahead_mask, None, rng)
 
