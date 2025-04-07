@@ -34,16 +34,14 @@ exceptiongroup==1.2.0
 executing==2.0.1
 fastjsonschema==2.19.1
 filelock==3.13.4
-Fiona @ file:///D:/Application/Conda/envs/geoneuro/Scripts/Fiona-1.8.21-cp39-cp39-win_amd64.whl#sha256=9e4fc7d7cf34e5136b8c3743bd5c6ea3ca00e72a95f976c28398518ab3730860
 flax==0.8.5
 folium==0.16.0
 fonttools==4.47.0
 fqdn==1.5.1
 fsspec==2023.12.2
-GDAL @ file:///D:/Application/Conda/envs/geoneuro/Scripts/GDAL-3.4.3-cp39-cp39-win_amd64.whl#sha256=d4f3650d26884da20bde7f33a542b02bfae7ccc017d44a9e6cf5600b84304878
 geographiclib==2.0
 geomloss==0.2.6
-geopandas==0.14.2
+# geopandas==0.14.2
 geopy==2.4.1
 gpxpy==1.6.2
 h11==0.14.0
@@ -120,16 +118,15 @@ protobuf==4.25.1
 psutil==5.9.7
 pure-eval==0.2.2
 pycparser==2.21
-pyFFTW==0.13.1
+# pyFFTW==0.13.1
 pygeos==0.14
 Pygments==2.17.2
 pyparsing==3.1.1
-pyproj @ file:///D:/Application/Conda/envs/geoneuro/Scripts/pyproj-3.3.1-cp39-cp39-win_amd64.whl#sha256=120d45ed73144c65e9677dc73ba8a531c495d179dd9f9f0471ac5acc02d7ac4b
 python-dateutil==2.8.2
 python-json-logger==2.0.7
 pytz==2023.3.post1
-pywin32==306
-pywinpty==2.0.13
+# pywin32==306
+# pywinpty==2.0.13
 PyYAML==6.0.1
 pyzmq==25.1.2
 qtconsole==5.5.1
@@ -145,7 +142,6 @@ scipy==1.13.0
 seaborn==0.13.2
 Send2Trash==1.8.2
 shap==0.45.0
-Shapely @ file:///D:/Application/Conda/envs/geoneuro/Scripts/Shapely-1.8.2-cp39-cp39-win_amd64.whl#sha256=7f8fbc0df0dd022079daf78bd41926a86c56e4107b169c104ebd77f741c5364c
 six==1.16.0
 slicer==0.0.7
 sniffio==1.3.1
