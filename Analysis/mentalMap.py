@@ -11,7 +11,7 @@ import pandas as pd
 import geopandas as gpd
 
 import packFuncForShap as pack4shap
-from SCBIRL_Global_PE.utils import globalPE, UserDataPart, load_fnid_coords_mapping, load_state_attrs
+from SCBIRL_Global_PE.utils import UserDataPart, load_fnid_coords_mapping
 from SCBIRL_Global_PE.migrationProcess import readAndPrepareData
 
 def mentalMap(who, date):
@@ -38,13 +38,12 @@ def mentalMap(who, date):
     visited_features_min = visited_features.min(axis=0)
     visited_features_max = visited_features.max(axis=0)
     # normalize the features
-    # BE_features = (BE_features - visited_features_min) / (visited_features_max - visited_features_min)
+    BE_features = (BE_features - visited_features_min) / (visited_features_max - visited_features_min)
     
     # compute the grid centroid and convert it to grid code
     grid_locations = city_grid_with_LU.geometry.centroid
     grid_coords = [(cent.x, cent.y) for cent in grid_locations]
-    state_dim = len(feature_name)
-    PE_features = [globalPE(coord, state_dim).flatten() for coord in grid_coords]
+    PE_features = np.array(grid_coords, dtype=np.float32)
     PE_features = np.array(PE_features)
         
     # for loop to predict score and save the geodataframe
@@ -52,6 +51,8 @@ def mentalMap(who, date):
     PE_arrays = PE_features[:, None, None, :]
     reward_arrays = model.reward(BE_arrays, PE_arrays)
     reward_arrays = reward_arrays.squeeze()
+    
+    normalized_reward = (reward_arrays[:, 0] - reward_arrays[:, 0].min()) / (reward_arrays[:, 0].max() - reward_arrays[:, 0].min())
     city_grid_with_reward = city_grid_with_LU.copy()
-    city_grid_with_reward['reward'] = reward_arrays[:, 0]
+    city_grid_with_reward['reward'] = normalized_reward
     return city_grid_with_reward
