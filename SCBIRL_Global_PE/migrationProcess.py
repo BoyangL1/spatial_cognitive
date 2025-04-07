@@ -97,14 +97,14 @@ def afterMigrt(model, dataPath, outputPath, start_date, iter_type):
     modelDir = outputPath + folder_name
     if not os.path.exists(modelDir):
         os.makedirs(modelDir)
-    memory_buffer = 10 # days
+    memory_buffer = 10 - 1 # days
 
     for i in range(len(trajIterChains)):
 
         if i < memory_buffer:
-            iter_training_set = trajInitChains[-(memory_buffer-i):] + trajIterChains[:i]
+            iter_training_set = trajInitChains[-(memory_buffer-i) :] + trajIterChains[: i]
         else:
-            iter_training_set = trajIterChains[i-memory_buffer:i]
+            iter_training_set = trajIterChains[i-memory_buffer : i]
         iter_training_set = iter_training_set + [trajIterChains[i]]
 
         # Process and calculate reward values after migration.

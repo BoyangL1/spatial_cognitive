@@ -40,14 +40,14 @@ def experienceModel(model_no_prior, dataPath, outputPath, start_date):
     modelDir = outputPath + "no_prior_model/"
     if not os.path.exists(modelDir):
         os.makedirs(modelDir)
-    memory_buffer = 10 # days
+    memory_buffer = 10 - 1 # days
 
     for i in range(len(trajIterChains)):
         model = copy.deepcopy(model_no_prior)
         if i < memory_buffer:
-            iter_training_set = trajInitChains[-(memory_buffer-i):] + trajIterChains[:i]
+            iter_training_set = trajInitChains[-(memory_buffer-i) : ] + trajIterChains[ : i]
         else:
-            iter_training_set = trajIterChains[i-memory_buffer:i]
+            iter_training_set = trajIterChains[i-memory_buffer : i]
         iter_training_set = iter_training_set + [trajIterChains[i]]
 
         # Process and calculate reward values after migration.
