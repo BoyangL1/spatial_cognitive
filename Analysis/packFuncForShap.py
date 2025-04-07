@@ -72,8 +72,6 @@ def modelPredict(X: np.ndarray[float, float], model, standardize = False,
     state = state[np.newaxis, np.newaxis, np.newaxis, :, :]
     positions = positions[np.newaxis, np.newaxis, np.newaxis, :, :]
 
-    print('The state shape is: {shape}'.format(shape=state.shape))
-    print('The positions shape is: {shape}'.format(shape=positions.shape))
     y_pred = list()
     for row in range(len(X)):
         # ref numpy take函数使用
@@ -197,7 +195,7 @@ def modelRewardExplain(date: int, who: int, binary_be_vs_loc = True, blank = Tru
     # below: group the shape var names
     varchr = 'LU_Business,LU_Green,LU_Industry,LU_Public,LU_Residence,subway,density,intersections,road_density,rent'
     varname_BE = varchr.split(',')
-    varname_PE = ['PE%02d' % i for i in range(6 * len(varname_BE))]
+    varname_PE = ['lon', 'lat']
     varname = varname_BE + varname_PE
     if binary_be_vs_loc:
         groupmap = {
@@ -255,9 +253,9 @@ def explainOneUser(user, parallel=False, binary_be_vs_loc=True, blank=True):
             shap_dict[date] = modelRewardExplain(date, who=user, binary_be_vs_loc=binary_be_vs_loc, blank=blank)
     else:
         # parallel version
-        CPU_COUNT = len(date_list)
+        MAX_CPU_COUNT = mp.cpu_count() - 2
         combination = [(date, user, binary_be_vs_loc, blank) for date in reversed(date_list)]
-        with mp.Pool(CPU_COUNT) as pool:
+        with mp.Pool(MAX_CPU_COUNT) as pool:
             shap_dict_values = pool.starmap(modelRewardExplain, combination)
         shap_dict = dict(zip(reversed(date_list), shap_dict_values))
     return shap_dict
@@ -326,7 +324,7 @@ if __name__ == '__main__':
     # user_list = [1102234]
     for user in user_list:
         # note: remember to change back
-        res = explainOneUser(user, parallel=False, binary_be_vs_loc=False)
+        res = explainOneUser(user, parallel=True, binary_be_vs_loc=False)
         with open('./product/shap_res_{:09d}.pkl'.format(user), 'wb') as f:
             pickle.dump(res, f)
     '''
