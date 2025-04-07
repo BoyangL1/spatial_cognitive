@@ -63,24 +63,22 @@ def modelPredict(X: np.ndarray[float, float], model, standardize = False,
         The reward can be either standardize or not.
     '''
     feature_num = model.s_dim
-    assert X.shape[1] == 7 * feature_num, "The input matrix does not have the correct number of features."
+    assert X.shape[1] == feature_num + 2, "The input matrix does not have the correct number of features."
     state = X[:, :feature_num]
-    pecode_real = X[:, feature_num:4 * feature_num]
-    pecode_imag = X[:, 4 * feature_num:]
-    # combine pecode_real and pecode_imag into a complex matrix
-    pecode = np.empty_like(pecode_real, dtype=complex)
-    pecode.real = pecode_real
-    pecode.imag = pecode_imag
+    positions = X[:, feature_num:feature_num+2]
     # predict the reward
     predict_function = SIRLM.getComputeFunction(model, attribute_type)
+    
     state = state[np.newaxis, np.newaxis, np.newaxis, :, :]
-    pecode = pecode[np.newaxis, np.newaxis, np.newaxis, :, :]
+    positions = positions[np.newaxis, np.newaxis, np.newaxis, :, :]
 
+    print('The state shape is: {shape}'.format(shape=state.shape))
+    print('The positions shape is: {shape}'.format(shape=positions.shape))
     y_pred = list()
     for row in range(len(X)):
         # ref numpy take函数使用
         state_current = np.take(state, indices=row, axis=-2)
-        pecode_current = np.take(pecode, indices=row, axis=-2)
+        pecode_current = np.take(positions, indices=row, axis=-2)
         res_val = predict_function(state_current, pecode_current)
         # note browser
         y_pred.append(res_val)
@@ -122,13 +120,9 @@ def backgroundData(who: int, date = None):
         feature_array = np.array(feature_array)
 
         # calculate pe code vector 
-        state_dim = feature_array.shape[1]        
-        # note 复用于topoMap.coords2compression
-        gc_vectors = [SIRLU.globalPE(coord, state_dim) for coord in chain.travel_chain]
-        gc_vectors = np.squeeze(np.array(gc_vectors), axis=-1)
-        gc_array = np.concatenate((gc_vectors.real, gc_vectors.imag), axis=1)
+        coords = np.array(chain.travel_chain)  # (lon, lat)
 
-        one_chain_array = np.concatenate((feature_array, gc_array), axis=1)
+        one_chain_array = np.concatenate((feature_array, coords), axis=1)
         total_array_list.append(one_chain_array)
 
     total_array = np.vstack(total_array_list)
@@ -332,7 +326,7 @@ if __name__ == '__main__':
     # user_list = [1102234]
     for user in user_list:
         # note: remember to change back
-        res = explainOneUser(user, parallel=True, binary_be_vs_loc=False)
+        res = explainOneUser(user, parallel=False, binary_be_vs_loc=False)
         with open('./product/shap_res_{:09d}.pkl'.format(user), 'wb') as f:
             pickle.dump(res, f)
     '''

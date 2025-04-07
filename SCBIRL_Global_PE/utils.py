@@ -404,6 +404,7 @@ def extract_week_ends(date_seq: List[int]):
     '''
     given a list of dates, return the week end dates and week code.
     '''
+    date_seq = sorted(set(date_seq))
     assert all(date_seq[i] < date_seq[i + 1] for i in range(len(date_seq) - 1)), \
         "The date sequence must be strictly increasing and unique."
         
