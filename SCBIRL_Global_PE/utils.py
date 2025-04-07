@@ -204,39 +204,6 @@ def padSequences(data_list, element_shape, padding_value=Padding):
     # Convert the list of lists of numpy arrays to a higher-dimensional numpy array
     return onp.array(padded_data_list)
 
-def globalPE(coords, dimension):
-    '''
-    Calculate positional encoding from coordinates:
-    A complex matrix of shape (dimension, 3) is returned.
-    '''
-    x,y = coords
-    Q = np.load('./data_pe/Q_matrix.npy')
-    with open('./data_pe/random_angle_list.pkl', 'rb') as file:
-        angle_list = pickle.load(file)
-
-    for k in range(1,dimension+1):
-        theta = 2 * onp.pi / 3  
-        R = onp.array([[onp.cos(theta), -onp.sin(theta)], [onp.sin(theta), onp.cos(theta)]])
-        scale_factor = (200**(k/dimension))
-        angle = angle_list[k-1]
-        omega_n0 = onp.array([onp.cos(angle), onp.sin(angle)]) * scale_factor
-        omega_n1 = R.dot(omega_n0)
-        omega_n2 = R.dot(omega_n1)
-
-        coords = onp.vstack((x, y))
-        eiw0x = onp.exp(1j * onp.dot(omega_n0,coords))
-        eiw1x = onp.exp(1j * onp.dot(omega_n1,coords))
-        eiw2x = onp.exp(1j * onp.dot(omega_n2,coords))
-
-        g_n = Q.dot(onp.array([eiw0x, eiw1x, eiw2x]))
-        if k == 1:
-            g = g_n
-        else:
-            g = onp.concatenate((g, g_n), axis=0)
-    return g
-
-
-
 def loadTrajChain(user_path, type: str, start_date=None):
     '''
     return the training data.
