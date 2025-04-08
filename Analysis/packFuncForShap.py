@@ -37,7 +37,7 @@ def modelPredict(X: np.ndarray[float, float], model, standardize = False,
     feature_num = model.s_dim
     assert X.shape[1] == feature_num + 2, "The input matrix does not have the correct number of features."
     state = X[:, :feature_num]
-    positions = X[:, feature_num:feature_num + 2]
+    positions = X[:, feature_num:]
     # predict the reward
     predict_function = SIRLM.getComputeFunction(model, attribute_type)
     
@@ -48,8 +48,8 @@ def modelPredict(X: np.ndarray[float, float], model, standardize = False,
     for row in range(len(X)):
         # ref numpy take函数使用
         state_current = np.take(state, indices=row, axis=-2)
-        pecode_current = np.take(positions, indices=row, axis=-2)
-        res_val = predict_function(state_current, pecode_current)
+        position_current = np.take(positions, indices=row, axis=-2)
+        res_val = predict_function(state_current, position_current)
         # note browser
         y_pred.append(res_val)
     
@@ -289,16 +289,14 @@ if __name__ == '__main__':
     '''
     Half Parallel Version
     '''
-    model_dir = './model/'
-    user_list = [int(name) for name in os.listdir(model_dir) if name.isdigit()]
-    user_list.sort()
-    user_list = user_list[1:]
-    # user_list = [1102234]
-    for user in user_list:
-        # note: remember to change back
-        res = explainOneUser(user, parallel=True, binary_be_vs_loc=False)
-        with open('./product/shap_res_{:09d}.pkl'.format(user), 'wb') as f:
-            pickle.dump(res, f)
+    # model_dir = './model/'
+    # user_list = [int(name) for name in os.listdir(model_dir) if name.isdigit()]
+    # user_list.sort()
+    # for user in user_list:
+    #     # note: remember to change back
+    #     res = explainOneUser(user, parallel=True, binary_be_vs_loc=False)
+    #     with open('./product/shap_res_{:09d}.pkl'.format(user), 'wb') as f:
+    #         pickle.dump(res, f)
     '''
     By Hand
     '''
@@ -313,19 +311,19 @@ if __name__ == '__main__':
     '''
     Inspect the baseline.
     '''
-    model_dir = './model/'
-    user_list = [int(name) for name in os.listdir(model_dir) if name.isdigit()]
-    user_list.sort()
-    reward_dict = dict()
-    for user in user_list:
-        date_list = modelDateOfUser(user)
-        for date in date_list:
-            reward_dict[(user, date)] = modelRewardBaselineCalculation(date, who=user)
-            with open('./product/reward_res.pkl', 'wb') as f:
-                    pickle.dump(reward_dict, f)
+    # model_dir = './model/'
+    # user_list = [int(name) for name in os.listdir(model_dir) if name.isdigit()]
+    # user_list.sort()
+    # reward_dict = dict()
+    # for user in user_list:
+    #     date_list = modelDateOfUser(user)
+    #     for date in date_list:
+    #         reward_dict[(user, date)] = modelRewardBaselineCalculation(date, who=user)
+    #         with open('./product/reward_res.pkl', 'wb') as f:
+    #                 pickle.dump(reward_dict, f)
     '''
     Test area
     '''
-    # shap_dict = dict()
-    # date = 20230507
-    # shap_dict[date] = modelRewardExplain(date, who=1102234)
+    shap_dict = dict()
+    date = 20230507
+    shap_dict[date] = modelRewardExplain(date, who=1102234)

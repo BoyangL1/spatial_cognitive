@@ -61,3 +61,4 @@ def experienceModel(model_no_prior, dataPath, outputPath, start_date):
         # Save the current model state.
         modelSavePath = modelDir + 'ignorant_model_' + str(iter_training_set[-1].date) + ".pickle"
         model.modelSave(modelSavePath)
+

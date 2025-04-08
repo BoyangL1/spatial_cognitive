@@ -295,3 +295,4 @@ if __name__ == "__main__":
     # res[who] = personInterpretEvaluation(who)    
     # with open('./product/interpretEvo_{:09d}.pkl'.format(i), 'wb') as file:
     #     pickle.dump(res, file)    
+    

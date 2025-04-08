@@ -1,4 +1,5 @@
 import pickle
+import os
 import copy
 import SCBIRL_Global_PE.SCBIRLTransformer as SIRLT
 import SCBIRL_Global_PE.utils as SIRLU
@@ -9,6 +10,11 @@ from SCBIRL_Global_PE.utils import Traveler, UserDataPart
 
 import jax
 jax.config.update('jax_platform_name', 'cpu')
+
+import dask
+from dask.distributed import Client, LocalCluster
+import numpy as np
+from tqdm.auto import tqdm
 
 def train_model_one_traveler(who: int):
     data_dir = UserDataPart + '{:09d}/'.format(who)
@@ -22,12 +28,13 @@ def train_model_one_traveler(who: int):
     model = SIRLT.avril(inputs, targets_action, positions, state_dim, action_dim, state_only=True)
     # model = avril_without_pe(inputs, targets_action,  state_dim, action_dim, state_only=True)
 
-    # model the model with no prior knowledge, just nearest experience
-    PriorKnow.experienceModel(model, data_dir, model_dir, start_date = iter_start_date)
-    # NOTE: Compute rewards after migration
-    model_no_prior = copy.deepcopy(model)
-    # from the tabular rasa, iteratively update the model with accumulated experience
-    SIRLP.afterMigrt(model_no_prior, data_dir, model_dir, start_date = iter_start_date, iter_type='prior')
+    # # model the model with no prior knowledge, just nearest experience
+    # # if the training is interrupted, we can resume the training from the last date.
+    # PriorKnow.experienceModel(model, data_dir, model_dir, start_date = iter_start_date)
+    # # NOTE: Compute rewards after migration
+    # model_no_prior = copy.deepcopy(model)
+    # # from the tabular rasa, iteratively update the model with accumulated experience
+    # SIRLP.afterMigrt(model_no_prior, data_dir, model_dir, start_date = iter_start_date, iter_type='prior')
 
     # NOTE: train the model before migration
     model.train(iters=1000, loss_threshold=0.001)
@@ -37,6 +44,90 @@ def train_model_one_traveler(who: int):
     # NOTE: Compute rewards after migration
     SIRLP.afterMigrt(model, data_dir, model_dir, start_date = iter_start_date, iter_type='recent')
 
+def train_models_parallel(who_list, n_workers=32, threads_per_worker=4):
+    """
+    Parallel model training using Dask for multiple travelers.
+    No return values needed as results are saved to disk directly.
+    Parameters:
+    -----------
+    who_list : list
+        List of traveler IDs to process
+    n_workers : int, default=32
+        Number of worker processes to use
+    threads_per_worker : int, default=4
+        Number of threads per worker (total threads = n_workers * threads_per_worker)
+    
+    """
+    # Set up Dask cluster
+    cluster = LocalCluster(
+        n_workers=n_workers,
+        threads_per_worker=threads_per_worker,
+        memory_limit='4GB'  # Adjust based on your server's RAM
+    )
+    client = Client(cluster)
+    print(f"Dashboard link: {client.dashboard_link}")
+    
+    try:
+        # Create delayed objects for each traveler
+        delayed_tasks = []
+        for who in who_list:
+            # Wrap the training function in delayed
+            train_model_dask = dask.delayed(train_model_one_traveler)
+            task = train_model_dask(who)
+            delayed_tasks.append(task)
+        
+        # Compute all tasks in parallel with progress bar
+        print(f"Training models for {len(who_list)} travelers...")
+        
+        # Use tqdm to show progress
+        with tqdm(total=len(who_list), desc="Training Progress") as pbar:
+            dask.compute(*delayed_tasks, scheduler='distributed')
+            pbar.update(len(who_list))
+            
+    finally:
+        # Clean up
+        client.close()
+        cluster.close()
+
+def train_model_batch(who_list, batch_size):
+    """
+    Train models in batches to manage memory usage.
+    Results are saved to disk directly by train_model_one_traveler.
+    Parameters:
+    -----------
+    who_list : list
+        List of traveler IDs to process
+    batch_size : int, default=1000
+        Number of travelers to process in each batch
+    """
+    
+    # Split who_list into batches
+    n_batches = (len(who_list) + batch_size - 1) // batch_size
+    who_batches = np.array_split(who_list, n_batches)
+    
+    print(f"Processing {len(who_list)} travelers in {n_batches} batches")
+    
+    # Process each batch
+    for i, batch in enumerate(who_batches):
+        print(f"\nProcessing batch {i+1}/{n_batches}")
+        train_models_parallel(batch.tolist())
+        print(f"Completed batch {i+1}/{n_batches}")
+
+def save_intermediate_results(results, filename):
+    """
+    Save intermediate results to avoid data loss.
+    
+    Parameters:
+    -----------
+    results : dict
+        Results to save
+    filename : str
+        Path to save the results
+    """
+    import pickle
+    with open(filename, 'wb') as f:
+        pickle.dump(results, f)
+
 if __name__ =="__main__":
     '''
         Iteration Version
@@ -44,7 +135,6 @@ if __name__ =="__main__":
     who_list = [1102234]
     for who in who_list:
         train_model_one_traveler(who = who)
-
     '''
         Parallel Version
     '''
@@ -59,6 +149,23 @@ if __name__ =="__main__":
     #     who_list.remove(who)
     # with mp.Pool(MAX_CPU_COUNT) as pool:
     #     pool.map(train_model_one_traveler, who_list)
+    '''
+        Professional Parallel Version
+    '''
+    # file_list = os.listdir(UserDataPart)
+    # # Example who_list
+    # who_list = [int(pid) for pid in file_list]
+    
+    # # Configure Dask for your hardware
+    # n_workers = 32  # Number of CPU cores
+    # threads_per_worker = 4  # Threads per worker (128/32 = 4)
+    
+    # # Train models with batch processing
+    # results = train_model_batch(
+    #     who_list,
+    #     batch_size=n_workers  # Adjust based on memory requirements
+    # )
+    
     '''
         Terminal Version
     '''

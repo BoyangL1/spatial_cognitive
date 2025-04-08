@@ -38,7 +38,7 @@ def encoder_model(inputs, positions, num_layers, num_heads, num_scale, dff_ratio
     feature_embedding_layer = hk.Linear(embedding_dim)
     x = feature_embedding_layer(inputs)
     
-    transformer_layers = [TransformerLayer(embedding_dim, num_heads, dff_ratio, rate) 
+    transformer_layers = [TransformerLayer(embedding_dim, num_heads, dff_ratio, use_rotation=True, rate=rate) 
                         for _ in range(num_layers)]
     
     for layer in transformer_layers:

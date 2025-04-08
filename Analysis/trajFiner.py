@@ -99,11 +99,21 @@ def eigenDecomposition(A, plot=True):
 
 def silhouette_optimal_k(similarity, k_range, plot=True):
     """
-    使用 Silhouette 分数自动选择最佳簇数。
+    Automatically select the optimal number of clusters using Silhouette score.
     
-    :param similarity: 相似性矩阵
-    :param k_range: 簇数的可能范围 (list 或 range)
-    :return: 最佳簇数
+    Parameters:
+    -----------
+    similarity : array-like
+        Similarity matrix
+    k_range : list or range
+        Range of possible cluster numbers to evaluate
+    plot : bool, default=True
+        Whether to plot the Silhouette scores
+        
+    Returns:
+    --------
+    best_k : int
+        Optimal number of clusters
     """
     best_k = None
     best_score = -1
@@ -111,11 +121,12 @@ def silhouette_optimal_k(similarity, k_range, plot=True):
     
     scores_record = []
     for k in k_range:
+        # Perform spectral clustering with current k
         clustering = SpectralClustering(n_clusters=k, affinity='precomputed', 
-                                        assign_labels='cluster_qr', random_state=42)
+                                      assign_labels='cluster_qr', random_state=42)
         labels = clustering.fit_predict(similarity)
-        # Silhouette 分数计算
-        # turn the similarity matrix into a dissimilarity matrix
+        
+        # Convert similarity to dissimilarity for Silhouette score calculation
         disimilarity = 1 - similarity
         np.fill_diagonal(disimilarity, 0)
         score = silhouette_score(disimilarity, labels, metric='precomputed')
@@ -134,13 +145,33 @@ def silhouette_optimal_k(similarity, k_range, plot=True):
         
     return best_k
 
-def topoNodeCluster(who, method = 'spectral', optimal='silhouette'):
+def topoNodeCluster(who, method='spectral', optimal='silhouette'):
+    """
+    Perform topological clustering on nodes based on their co-occurrence patterns.
+    
+    Parameters:
+    -----------
+    who : int
+        User ID
+    method : str, default='spectral'
+        Clustering method ('spectral', 'louvain', 'hdbscan', or 'dbscan')
+    optimal : str or int, default='silhouette'
+        Method for determining optimal cluster number ('gap', 'silhouette', or specific number)
+        
+    Returns:
+    --------
+    labels : array-like
+        Cluster labels for each node
+    """
+    # Load user's visit data and location mappings
     visit_dates = SIRLU.visited_date(who)
     id_coords_mapping = SIRLU.load_id_coords_mapping(who)
     total_loc_number = len(id_coords_mapping)
     
+    # Extract week-end dates
     week_end_dates, _ = SIRLU.extract_week_ends(visit_dates)
     
+    # Load or compute weekly clustering results
     res_dir = topoResPath(who)
     if not os.path.exists(res_dir):
         cluster_by_week = [clusterLocations(who, week_end_date) for week_end_date in week_end_dates]
@@ -149,42 +180,53 @@ def topoNodeCluster(who, method = 'spectral', optimal='silhouette'):
         cluster_by_week = [SIRLU.load_pickle_binary(os.path.join(res_dir, file)) for file in compute_res]
     _, id_coorders_mapping_edit_list, _, cluster_labels_list = list(zip(*cluster_by_week))
     
+    # Initialize similarity matrix and appearance counter
     similarity = np.zeros((total_loc_number, total_loc_number))
     appearance = np.zeros(total_loc_number)
+    
+    # Calculate co-occurrence based similarity
     for id_coorders_mapping_edit, cluster_label in zip(id_coorders_mapping_edit_list, cluster_labels_list):
         location_ids = np.array(list(id_coorders_mapping_edit.keys()))
         appearance[location_ids] += 1
         
+        # Create co-occurrence matrix for current week
         cluster_label_row = np.array(cluster_label)
         cluster_label_column = np.array(cluster_label).reshape(-1, 1)
         cluster_label_judge = cluster_label_row == cluster_label_column
         
+        # Create upper triangular mask
         seg_loc_len = len(cluster_label)
         masker = np.full((seg_loc_len, seg_loc_len), False)
         masker[np.triu_indices(seg_loc_len, 1)] = True
         
+        # Update similarity matrix based on co-occurrences
         co_idx = np.where(cluster_label_judge & masker)
         co_ids = [(location_ids[i], location_ids[j]) for i, j in zip(*co_idx)]
         for co_id in co_ids:
             similarity[co_id] += 1
+            
+    # Normalize similarity by appearance frequency
     appearance_2d = appearance[:, np.newaxis]
     appearance_base = np.minimum(appearance_2d, appearance_2d.T)
     similarity_corrected = similarity / appearance_base
     
+    # Create symmetric affinity matrix
     affinity = similarity_corrected + similarity_corrected.T
     affinity[np.where(affinity == 0)] += 1e-6
     np.fill_diagonal(affinity, 0)
+    
+    # Perform clustering based on specified method
     if method == 'spectral':
         if optimal == 'gap':
             n_clusters, *_ = eigenDecomposition(affinity, plot=True)
-            # note: use kneed to find the optimal k
         elif optimal == 'silhouette':
             start_number, end_number = floor(0.1 * total_loc_number), floor(0.9 * total_loc_number)
             n_clusters = silhouette_optimal_k(affinity, range(start_number, end_number + 1))
-        elif type(optimal) == int:
+        elif isinstance(optimal, int):
             n_clusters = optimal
-        clusterer = SpectralClustering(n_clusters=n_clusters, affinity='precomputed', eigen_solver='arpack', 
-                                       assign_labels='cluster_qr', random_state=42)
+        clusterer = SpectralClustering(n_clusters=n_clusters, affinity='precomputed',
+                                     eigen_solver='arpack', assign_labels='cluster_qr',
+                                     random_state=42)
         labels = clusterer.fit_predict(affinity)
     elif method == 'louvain':
         G = nx.from_numpy_matrix(affinity)
@@ -208,27 +250,74 @@ def topoNodeCluster(who, method = 'spectral', optimal='silhouette'):
     return labels
     
 def nodeVerTraj(who, labels):
+    """
+    Convert location IDs in trajectories to their corresponding cluster labels.
+    
+    Parameters:
+    -----------
+    who : int
+        User ID
+    labels : array-like
+        Cluster labels for each location
+        
+    Returns:
+    --------
+    node_chain_list : list
+        List of trajectories where locations are replaced by their cluster labels
+    """
     visit_dates = SIRLU.visited_date(who)
     traj_total = SIRLU.load_all_traj(who)
     
-    # calculate the visiting sequence: 
+    # Map location IDs to cluster labels
     id_chain_list = [traj.id_chain for traj in traj_total]
-    id_node_map = { i: lab for i, lab in enumerate(labels) }
+    id_node_map = {i: lab for i, lab in enumerate(labels)}
     node_chain_list = [[id_node_map[iden] for iden in id_chain] for id_chain in id_chain_list]
     assert len(visit_dates) == len(node_chain_list), "The date sequence does not match chain sequence."
     
     return node_chain_list
 
 def nodeVisitScan(who, labels):
+    """
+    Create a binary matrix indicating presence/absence of each cluster in each trajectory.
+    
+    Parameters:
+    -----------
+    who : int
+        User ID
+    labels : array-like
+        Cluster labels for each location
+        
+    Returns:
+    --------
+    node_scan : list of bool arrays
+        Binary matrix where each row represents a cluster and each column represents a trajectory
+    """
     node_num = np.max(labels)
     node_chain_list = nodeVerTraj(who, labels)
     node_scan = [[node in node_chain for node_chain in node_chain_list] for node in range(node_num)]
     return node_scan
 
 def nodeTrajCount(who, labels):
+    """
+    Count the frequency of each unique trajectory pattern in terms of cluster sequences.
+    
+    Parameters:
+    -----------
+    who : int
+        User ID
+    labels : array-like
+        Cluster labels for each location
+        
+    Returns:
+    --------
+    node_count : Counter
+        Counter object containing frequencies of each trajectory pattern
+    """
     node_chain_list = nodeVerTraj(who, labels)
     node_count = Counter(node_chain_list)
     return node_count
+
+
 
 if __name__ == "__main__":
     who = 58124481
