@@ -129,7 +129,7 @@ class avril:
         r_par = np.squeeze(r_par,axis = 2)
         return r_par
     
-    def QValue(self,state,positions):
+    def QValue(self,state, positions):
         enc_output = self.encoder.apply(
                 self.e_params,
                 self.key,

@@ -11,6 +11,8 @@ from datetime import date, timedelta, datetime
 from sklearn.preprocessing import MinMaxScaler
 from typing import List
 
+from SCBIRL_Global_PE import SCBIRLTransformer as SIRLT
+
 TravelData = namedtuple('TravelChain', ['date', 'travel_chain','id_chain','fnid_chain'])
 Traveler = namedtuple('Traveler', ['who', 'visit_date', 'iter_start_date'])
 training_baseline_count = 50
@@ -44,6 +46,35 @@ def loadTravelChainAll(who: int):
     chains_loaded = loadTravelDataFromDicts(all_trajs)
     return chains_loaded
     
+
+def loadModel(who, date = None, prior = True, accumulate = False, tabular = False):
+    '''
+        Load the model from the model directory.
+        Must correctly set the directory at first.
+    '''
+    data_dir = UserDataPart + toWhoString(who) + '/'
+    model_dir = './model/' + toWhoString(who) + '/'
+    
+    iter_start_date = load_traveler(who).iter_start_date
+    inputs, targets_action, pe_code, action_dim, state_dim = loadTrajChain(data_dir, type='before', start_date=iter_start_date)
+    print(inputs.shape, targets_action.shape, pe_code.shape)
+    model = SIRLT.avril(inputs, targets_action, pe_code, state_dim, action_dim, state_only=True)
+    if tabular: 
+        return model
+    
+    if date is None or date < iter_start_date:
+        path = model_dir + 'initial_model.pickle'
+    else:
+        if prior:
+            modeltype = 'evolution_model/iterated_model_'        
+        elif accumulate:
+            modeltype = 'empirical_model/increased_model_'
+        else:
+            modeltype = 'no_prior_model/ignorant_model_'
+        path = model_dir + modeltype + '{date}.pickle'.format(date=date)
+    model.loadParams(path)
+    return model
+
 
 def getStateRow(state_attribute, state_fnid):
     '''

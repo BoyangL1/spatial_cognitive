@@ -26,34 +26,6 @@ jax.config.update('jax_platform_name', 'cpu')
 MAX_CPU_COUNT = mp.cpu_count() - 1
 # MAX_CPU_COUNT = 48
 
-def loadModel(who, date = None, prior = True, accumulate = False, tabular = False):
-    # todo: move to the utils
-    '''
-        Load the model from the model directory.
-        Must correctly set the directory at first.
-    '''
-    data_dir = UserDataPart + SIRLU.toWhoString(who) + '/'
-    model_dir = './model/' + SIRLU.toWhoString(who) + '/'
-    
-    iter_start_date = SIRLU.load_traveler(who).iter_start_date
-    inputs, targets_action, pe_code, action_dim, state_dim = SIRLU.loadTrajChain(data_dir, type='before', start_date=iter_start_date)
-    print(inputs.shape, targets_action.shape, pe_code.shape)
-    model = SIRLT.avril(inputs, targets_action, pe_code, state_dim, action_dim, state_only=True)
-    if tabular: 
-        return model
-    
-    if date is None or date < iter_start_date:
-        path = model_dir + 'initial_model.pickle'
-    else:
-        if prior:
-            modeltype = 'evolution_model/iterated_model_'        
-        elif accumulate:
-            modeltype = 'empirical_model/increased_model_'
-        else:
-            modeltype = 'no_prior_model/ignorant_model_'
-        path = model_dir + modeltype + '{date}.pickle'.format(date=date)
-    model.loadParams(path)
-    return model
 
 def modelPredict(X: np.ndarray[float, float], model, standardize = False,
                  attribute_type = 'reward', mu = None, sigma = None):
@@ -65,7 +37,7 @@ def modelPredict(X: np.ndarray[float, float], model, standardize = False,
     feature_num = model.s_dim
     assert X.shape[1] == feature_num + 2, "The input matrix does not have the correct number of features."
     state = X[:, :feature_num]
-    positions = X[:, feature_num:feature_num+2]
+    positions = X[:, feature_num:feature_num + 2]
     # predict the reward
     predict_function = SIRLM.getComputeFunction(model, attribute_type)
     
@@ -164,7 +136,7 @@ def modelRewardExplain(date: int, who: int, binary_be_vs_loc = True, blank = Tru
         Give the SHAP value by grouping the type.
     '''
     print('Explaining person: {who:9d}, date: {date}'.format(who=who, date=date))
-    model = loadModel(who=who, date=date)
+    model = SIRLU.loadModel(who=who, date=date)
 
     dataset, visited_id = backgroundData(who=who, date=date)
     dataset_uni, dataset_freq, dataset_iden = sparseBackground(dataset, visited_id)
@@ -284,7 +256,7 @@ def modelRewardBaselineCalculation(date: int, who: int):
         Give the SHAP value by grouping the type.
     '''
     print('Explaining person: {who:8d}, date: {date}'.format(who=who, date=date))
-    model = loadModel(who=who, date=date)
+    model = SIRLU.loadModel(who=who, date=date)
     # modelPredWrapper = partial(modelPredict, model=model, attribute_type='reward')
 
     dataset, visited_id = backgroundData(who=who, date = date)

@@ -22,10 +22,11 @@ def train_model_one_traveler(who: int):
     model = SIRLT.avril(inputs, targets_action, positions, state_dim, action_dim, state_only=True)
     # model = avril_without_pe(inputs, targets_action,  state_dim, action_dim, state_only=True)
 
-    # model the model with no prior knowledge
+    # model the model with no prior knowledge, just nearest experience
     PriorKnow.experienceModel(model, data_dir, model_dir, start_date = iter_start_date)
     # NOTE: Compute rewards after migration
     model_no_prior = copy.deepcopy(model)
+    # from the tabular rasa, iteratively update the model with accumulated experience
     SIRLP.afterMigrt(model_no_prior, data_dir, model_dir, start_date = iter_start_date, iter_type='prior')
 
     # NOTE: train the model before migration
@@ -40,24 +41,24 @@ if __name__ =="__main__":
     '''
         Iteration Version
     '''
-    # for who in who_list:
-    #     train_model_one_traveler(who = who)
+    who_list = [1102234]
+    for who in who_list:
+        train_model_one_traveler(who = who)
 
     '''
         Parallel Version
     '''
-    import multiprocessing as mp
-    import os
+    # import multiprocessing as mp
+    # import os
     
-    MAX_CPU_COUNT = mp.cpu_count() - 2
-    done_who = [1102234, 102181433]
-    file_list = os.listdir(UserDataPart)
-    who_list = [int(pid) for pid in file_list]
-    for who in done_who:
-        who_list.remove(who)
-    with mp.Pool(MAX_CPU_COUNT) as pool:
-        pool.map(train_model_one_traveler, who_list)
-
+    # MAX_CPU_COUNT = mp.cpu_count() - 2
+    # done_who = []
+    # file_list = os.listdir(UserDataPart)
+    # who_list = [int(pid) for pid in file_list]
+    # for who in done_who:
+    #     who_list.remove(who)
+    # with mp.Pool(MAX_CPU_COUNT) as pool:
+    #     pool.map(train_model_one_traveler, who_list)
     '''
         Terminal Version
     '''
