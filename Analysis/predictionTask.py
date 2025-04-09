@@ -5,11 +5,9 @@ import numpy as np
 working_directory = os.path.abspath('.')
 sys.path.append(working_directory)
 
-import SCBIRL_Global_PE.SCBIRLTransformer as SIRLT
 import SCBIRL_Global_PE.utils as SIRLU
 from SCBIRL_Global_PE.migrationProcess import *
-import packFuncForShap as pack4shap
-from SCBIRL_Global_PE.utils import TravelData, Traveler, Padding
+from SCBIRL_Global_PE.utils import TravelData, Padding, loadModel
 from geopy.distance import geodesic
 import pickle
 
@@ -143,16 +141,16 @@ def personPredictEvaluation(who: int):
         end_date = evolution_date_range[-1]
         
         if evolution_pos < 10:
-            prior_model = pack4shap.loadModel(who=who, )
+            prior_model = loadModel(who=who, )
         else:
             prior_evolution_date = evoludate[evolution_pos - 10]
-            prior_model = pack4shap.loadModel(who=who, date=prior_evolution_date, prior=True)
+            prior_model = loadModel(who=who, date=prior_evolution_date, prior=True)
 
-        experience_model = pack4shap.loadModel(who=who, date=one_evolution_date, prior=False)
+        experience_model = loadModel(who=who, date=one_evolution_date, prior=False)
 
-        complete_model = pack4shap.loadModel(who=who, date=one_evolution_date, prior=True)
+        complete_model = loadModel(who=who, date=one_evolution_date, prior=True)
 
-        tabula_rasa_model = pack4shap.loadModel(who=who, tabular=True)
+        tabula_rasa_model = loadModel(who=who, tabular=True)
 
         state_attribute = SIRLU.load_state_attrs(who, before=False)
         
@@ -230,20 +228,20 @@ def personInterpretEvaluation(who: int, period: str = 'future'):
         else:
             raise ValueError("Invalid period argument. Use 'future' or 'total'.")
         
-        prior_model = pack4shap.loadModel(who=who, )
+        prior_model = loadModel(who=who, )
         if evolution_pos < 10:
             recent_knowledge_model = prior_model
         else:
             prior_evolution_date = evoludate[evolution_pos - 10]
-            recent_knowledge_model = pack4shap.loadModel(who=who, date=prior_evolution_date, prior=True)
+            recent_knowledge_model = loadModel(who=who, date=prior_evolution_date, prior=True)
 
-        recent_experience_model = pack4shap.loadModel(who=who, date=one_evolution_date, prior=False)
+        recent_experience_model = loadModel(who=who, date=one_evolution_date, prior=False)
 
-        accumulated_experience_model = pack4shap.loadModel(who=who, date=one_evolution_date, prior=False, accumulate=True)
+        accumulated_experience_model = loadModel(who=who, date=one_evolution_date, prior=False, accumulate=True)
         
-        complete_model = pack4shap.loadModel(who=who, date=one_evolution_date, prior=True)
+        complete_model = loadModel(who=who, date=one_evolution_date, prior=True)
 
-        tabula_rasa_model = pack4shap.loadModel(who=who, tabular=True)
+        tabula_rasa_model = loadModel(who=who, tabular=True)
 
         df_recent = modelEvaluation(recent_knowledge_model, who, start_date, end_date, mode='reward')
         df_experience = modelEvaluation(recent_experience_model, who, start_date, end_date, mode='reward')
@@ -297,3 +295,4 @@ if __name__ == "__main__":
     # res[who] = personInterpretEvaluation(who)    
     # with open('./product/interpretEvo_{:09d}.pkl'.format(i), 'wb') as file:
     #     pickle.dump(res, file)    
+    

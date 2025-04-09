@@ -10,12 +10,11 @@ import numpy as np
 import pandas as pd
 import geopandas as gpd
 
-import packFuncForShap as pack4shap
-from SCBIRL_Global_PE.utils import UserDataPart, load_fnid_coords_mapping
+from SCBIRL_Global_PE.utils import UserDataPart, load_fnid_coords_mapping, loadModel
 from SCBIRL_Global_PE.migrationProcess import readAndPrepareData
 
 def mentalMap(who, date):
-    model = pack4shap.loadModel(who, date)
+    model = loadModel(who, date)
     
     # read the geodataframe
     path = './data/city_grid_features/city_grid_features.geojson'

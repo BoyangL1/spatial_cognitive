@@ -157,7 +157,7 @@ def modelRewardExplain(date: int, who: int, binary_be_vs_loc = True, blank = Tru
         Give the SHAP value by grouping the type.
     '''
     print('Explaining person: {who:9d}, date: {date}'.format(who=who, date=date))
-    model = loadModel(who=who, date=date)
+    model = SIRLU.loadModel(who=who, date=date)
 
     dataset, visited_id = backgroundData(who=who, date=date)
     dataset_uni, dataset_freq, dataset_iden = sparseBackground(dataset, visited_id)
@@ -278,7 +278,7 @@ def modelRewardBaselineCalculation(date: int, who: int):
         Give the SHAP value by grouping the type.
     '''
     print('Explaining person: {who:8d}, date: {date}'.format(who=who, date=date))
-    model = loadModel(who=who, date=date)
+    model = SIRLU.loadModel(who=who, date=date)
     # modelPredWrapper = partial(modelPredict, model=model, attribute_type='reward')
 
     dataset, visited_id = backgroundData(who=who, date = date)
@@ -333,19 +333,19 @@ if __name__ == '__main__':
     '''
     Inspect the baseline.
     '''
-    model_dir = './model/'
-    user_list = [int(name) for name in os.listdir(model_dir) if name.isdigit()]
-    user_list.sort()
-    reward_dict = dict()
-    for user in user_list:
-        date_list = modelDateOfUser(user)
-        for date in date_list:
-            reward_dict[(user, date)] = modelRewardBaselineCalculation(date, who=user)
-            with open('./product/reward_res.pkl', 'wb') as f:
-                    pickle.dump(reward_dict, f)
+    # model_dir = './model/'
+    # user_list = [int(name) for name in os.listdir(model_dir) if name.isdigit()]
+    # user_list.sort()
+    # reward_dict = dict()
+    # for user in user_list:
+    #     date_list = modelDateOfUser(user)
+    #     for date in date_list:
+    #         reward_dict[(user, date)] = modelRewardBaselineCalculation(date, who=user)
+    #         with open('./product/reward_res.pkl', 'wb') as f:
+    #                 pickle.dump(reward_dict, f)
     '''
     Test area
     '''
-    # shap_dict = dict()
-    # date = 20230507
-    # shap_dict[date] = modelRewardExplain(date, who=1102234)
+    shap_dict = dict()
+    date = 20230507
+    shap_dict[date] = modelRewardExplain(date, who=1102234)

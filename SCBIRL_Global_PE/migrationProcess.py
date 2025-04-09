@@ -19,11 +19,11 @@ def getComputeFunction(model, attribute_type):
     The fed grid code should be complex array.
     """
     if attribute_type == 'value':
-        return lambda state,grid_code: np.max(model.QValue(state, grid_code))
+        return lambda state, position: np.max(model.QValue(state, position))
     elif attribute_type == 'transition_prob':
-        return lambda state,grid_code: softmax(model.QValue(state, grid_code)[0][0])
+        return lambda state, position: softmax(model.QValue(state, position)[0][0])
     elif attribute_type == 'reward':
-        return lambda state,grid_code: model.reward(state, grid_code)[0][0][0]
+        return lambda state, position: model.reward(state, position)
     else:
         raise ValueError("attribute_type should be either 'value', 'reward', or 'transition_prob'.")
 
