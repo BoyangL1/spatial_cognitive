@@ -1,16 +1,17 @@
 import jax.numpy as np
 import numpy as onp
 import pandas as pd
-from scipy.linalg import qr
 import json
 import pickle
 import os
+import pyproj
 
+
+from scipy.linalg import qr
 from collections import namedtuple
 from datetime import date, timedelta, datetime
 from sklearn.preprocessing import MinMaxScaler
 from typing import List
-
 from SCBIRL_Global_PE import SCBIRLTransformer as SIRLT
 
 TravelData = namedtuple('TravelChain', ['date', 'travel_chain','id_chain','fnid_chain'])
@@ -90,6 +91,45 @@ def getActionDim(all_chains):
     """
     # 去所有出行链中id 最大的一个编号, 加1为长度, 再加1为no action
     return max({id for tc in all_chains for id in tc.id_chain}) + 2 # id_chain is a sequence, so the length = max +1 +1
+
+def coords2UTMmeters(coords: np.ndarray):
+    """
+    Convert geographic coordinates (lon, lat) to UTM coordinates (x, y) in EPSG:32650 system.
+    
+    Parameters:
+    -----------
+    id_coords_mapping : dict
+        Dictionary mapping IDs to [lon, lat] coordinates
+    
+    Returns:
+    --------
+    np.array
+        Array of shape with the final dimension as 2 containing [x, y] UTM coordinates
+    """
+    
+    assert coords.shape[-1] == 2, "The final dimension of the input coordinates must be two."
+    crs_src = pyproj.CRS('EPSG:4326')
+    crs_tgt = pyproj.CRS('EPSG:32650')
+    transformer = pyproj.Transformer.from_crs(crs_src, crs_tgt, always_xy=True)
+    
+    coords_reshape = coords.reshape(-1, 2)
+    # Convert coordinates
+    utm_reshape = []
+    for coord in coords_reshape:
+        lon, lat = coord
+        if abs(lon) > 180 or abs(lat) > 90:
+            # strange value, keep the same
+            x, y = lon, lat
+        else:
+            x, y = transformer.transform(lon, lat)
+            # turn to km.
+            x, y = x / 1e3, y / 1e3
+        utm_reshape.append([x, y])
+    utm_reshape = np.array(utm_reshape)
+    utm = utm_reshape.reshape(coords.shape)
+    return utm
+
+
 
 def preprocessStateAttributes(all_feature_path):
     '''
@@ -260,6 +300,7 @@ def loadTrajChain(user_path, type: str, start_date=None):
     # 这里的state_next_state是一个四维数组，第一维是轨迹条数，第二维是轨迹最大长度（即每条轨迹pair数），第三维是状态数（2），第四维是特征数
     # action_next_action是一个四维数组，第一维是轨迹条数，第二维是轨迹最大长度（即每条轨迹pair数），第三维是状态数（2），第四维是虚假轴
     # 第三个输出grid_next_grid是四维数组, dim(num_traj, max_traj_len, 2, nlevel)
+    positions_next_positions = coords2UTMmeters(positions_next_positions)
     return state_next_state, action_next_action, positions_next_positions, a_dim, s_dim
     
 def plugInDataPair(tc, stateAttribute, model, visitedState):

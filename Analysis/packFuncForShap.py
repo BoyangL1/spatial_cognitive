@@ -41,19 +41,20 @@ def modelPredict(X: np.ndarray[float, float], model, standardize = False,
     # predict the reward
     predict_function = SIRLM.getComputeFunction(model, attribute_type)
     
-    state = state[np.newaxis, np.newaxis, np.newaxis, :, :]
-    positions = positions[np.newaxis, np.newaxis, np.newaxis, :, :]
+    state = state[np.newaxis, :, np.newaxis, :]
+    positions = positions[np.newaxis, :, np.newaxis, :]
 
-    y_pred = list()
-    for row in range(len(X)):
-        # ref numpy take函数使用
-        state_current = np.take(state, indices=row, axis=-2)
-        position_current = np.take(positions, indices=row, axis=-2)
-        res_val = predict_function(state_current, position_current)
-        # note browser
-        y_pred.append(res_val)
+    # y_pred = list()
+    # for row in range(len(X)):
+    #     # ref numpy take函数使用
+    #     state_current = np.take(state, indices=row, axis=-2)
+    #     position_current = np.take(positions, indices=row, axis=-2)
+    #     res_val = predict_function(state_current, position_current)
+    #     # note browser
+    #     y_pred.append(res_val)
+    res_val = predict_function(state, positions)
+    y_pred = res_val[0, :, 0]
     
-    y_pred = np.array(y_pred)
     if standardize:
         y_pred = (y_pred - mu) / sigma
     return y_pred
