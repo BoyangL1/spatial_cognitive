@@ -4,7 +4,7 @@ import jax.numpy as np
 from .gridAttn import GridCellPositionalEncoding
 
 class MultiHeadSelfGridAttention(hk.Module):
-    def __init__(self, d_model, num_heads, use_rotation=False):
+    def __init__(self, d_model, num_heads, use_rotation=True):
         super().__init__()
         self.d_model = d_model
         self.num_heads = num_heads
@@ -27,7 +27,7 @@ class MultiHeadSelfGridAttention(hk.Module):
         x = x.reshape(batch_size, -1, self.num_heads, self.depth)
         return x.transpose(0, 2, 1, 3)
 
-    def attention(self, query, key, value):
+    def attention(self, query, key, value):        
         matmul_qk = np.matmul(query, key.transpose(0, 1, 3, 2))
         dk = np.float32(self.depth)
         scaled_attention_logits = matmul_qk / np.sqrt(dk)
@@ -75,7 +75,7 @@ class PointWiseFeedForwardNetwork(hk.Module):
         return x
 
 class TransformerLayer(hk.Module):
-    def __init__(self, d_model, num_heads, dff_ratio, use_rotation=False, rate=0.1):
+    def __init__(self, d_model, num_heads, dff_ratio, use_rotation=True, rate=0.1):
         super().__init__()
         dff = d_model * dff_ratio
         self.mha = MultiHeadSelfGridAttention(d_model, num_heads, use_rotation=use_rotation)
@@ -103,7 +103,7 @@ class TransformerLayer(hk.Module):
 "********************Decoder Layer******************"
 
 class MultiHeadGridAttention(hk.Module):
-    def __init__(self, d_model, num_heads, use_rotation=False):
+    def __init__(self, d_model, num_heads, use_rotation=True):
         super().__init__()
         self.d_model = d_model
         self.num_heads = num_heads
@@ -172,7 +172,7 @@ class MultiHeadGridAttention(hk.Module):
 
 
 class TransformerDecoderLayer(hk.Module):
-    def __init__(self, d_model, num_heads, dff_ratio, use_rotation=False, rate=0.1):
+    def __init__(self, d_model, num_heads, dff_ratio, use_rotation=True, rate=0.1):
         super().__init__()
         dff = d_model * dff_ratio
         self.mha1 = MultiHeadGridAttention(d_model, num_heads, use_rotation=use_rotation)

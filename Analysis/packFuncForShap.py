@@ -7,7 +7,7 @@ sys.path.append(working_directory)
 import SCBIRL_Global_PE.SCBIRLTransformer as SIRLT
 import SCBIRL_Global_PE.utils as SIRLU
 import SCBIRL_Global_PE.migrationProcess as SIRLM
-from SCBIRL_Global_PE.utils import TravelData, Traveler, UserDataPart
+from SCBIRL_Global_PE.utils import TravelData, Traveler, UserDataPart, convert_positions_to_utm
 
 import numpy as np
 import pandas as pd
@@ -37,6 +37,7 @@ def loadModel(who, date = None, prior = True, accumulate = False, tabular = Fals
     
     iter_start_date = SIRLU.load_traveler(who).iter_start_date
     inputs, targets_action, pe_code, action_dim, state_dim = SIRLU.loadTrajChain(data_dir, type='before', start_date=iter_start_date)
+    pe_code = convert_positions_to_utm(pe_code)
     print(inputs.shape, targets_action.shape, pe_code.shape)
     model = SIRLT.avril(inputs, targets_action, pe_code, state_dim, action_dim, state_only=True)
     if tabular: 
@@ -66,22 +67,14 @@ def modelPredict(X: np.ndarray[float, float], model, standardize = False,
     assert X.shape[1] == feature_num + 2, "The input matrix does not have the correct number of features."
     state = X[:, :feature_num]
     positions = X[:, feature_num:feature_num+2]
+    positions = convert_positions_to_utm(positions)
     # predict the reward
-    predict_function = SIRLM.getComputeFunction(model, attribute_type)
-    
-    state = state[np.newaxis, np.newaxis, np.newaxis, :, :]
-    positions = positions[np.newaxis, np.newaxis, np.newaxis, :, :]
+    state = state.reshape(1, -1, 1, state.shape[1])
+    positions = positions.reshape(1, -1, 1, positions.shape[1])
 
-    y_pred = list()
-    for row in range(len(X)):
-        # ref numpy take函数使用
-        state_current = np.take(state, indices=row, axis=-2)
-        pecode_current = np.take(positions, indices=row, axis=-2)
-        res_val = predict_function(state_current, pecode_current)
-        # note browser
-        y_pred.append(res_val)
+    y_pred = model.reward(state, positions)
+    y_pred = y_pred[0, :, 0] 
     
-    y_pred = np.array(y_pred)
     if standardize:
         y_pred = (y_pred - mu) / sigma
     return y_pred
@@ -171,7 +164,8 @@ def modelRewardExplain(date: int, who: int, binary_be_vs_loc = True, blank = Tru
     print('Data with {k} rows'.format(k=dataset_uni.shape[0]))
 
     if blank:
-        built_bench = np.zeros(model.s_dim).reshape(1, -1)
+        # built_bench = np.zeros(model.s_dim).reshape(1, -1)
+        built_bench = np.mean(dataset[:, :model.s_dim], axis=0).reshape(1, -1)
         locat_bench = np.mean(dataset[:, model.s_dim:], axis=0).reshape(1, -1)
         # zero_bench = np.zeros(dataset.shape[1]).reshape(1, -1)
         # 基线意味着：建成环境取最小值，位置环境取平均值
@@ -320,8 +314,6 @@ if __name__ == '__main__':
     model_dir = './model/'
     user_list = [int(name) for name in os.listdir(model_dir) if name.isdigit()]
     user_list.sort()
-    user_list = user_list[1:]
-    # user_list = [1102234]
     for user in user_list:
         # note: remember to change back
         res = explainOneUser(user, parallel=True, binary_be_vs_loc=False)

@@ -52,7 +52,7 @@ class GridCellPositionalEncoding(hk.Module):
         - theta: (batch_size, num_head, seq_length, n, num_scales) real-valued tensor.
         """
         theta_heads = []
-        mag = 1 / (10000 ** (2 * self.n * np.arange(self.num_scales, dtype=np.float32)[:, None] / self.num_head_dim))
+        mag = 1 / (100 ** (2 * self.n * np.arange(self.num_scales, dtype=np.float32)[:, None] / self.num_head_dim))
         for i in range(self.num_heads):
             subkey = random.fold_in(key, i)
             omega = self._generate_simplex_vectors_with_projection(self.dimension, subkey)

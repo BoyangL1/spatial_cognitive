@@ -31,14 +31,12 @@ def encoder_model(inputs, positions, num_layers, num_heads, num_scale, dff_ratio
     inputs: 输入特征 [batch_size, seq_len, 2, 10]
     positions: 经纬度坐标 [batch_size, seq_len, 2, 2]
     """
-    # 升维层：将10维特征升维到144维
-    # 提取position最后一个维度的维数
     position_dim = positions.shape[-1]
     embedding_dim = 2 * (position_dim + 1) * num_scale * num_heads
     feature_embedding_layer = hk.Linear(embedding_dim)
     x = feature_embedding_layer(inputs)
     
-    transformer_layers = [TransformerLayer(embedding_dim, num_heads, dff_ratio, rate) 
+    transformer_layers = [TransformerLayer(embedding_dim, num_heads, dff_ratio, use_rotation=True, rate=rate) 
                         for _ in range(num_layers)]
     
     for layer in transformer_layers:
@@ -57,8 +55,6 @@ def q_network_model(inputs, positions, enc_output, num_layers, num_heads, num_sc
     inputs: 输入特征 [batch_size, seq_len, 2, 10]
     positions: 经纬度坐标 [batch_size, seq_len, 2, 2]
     """
-    # 升维层：将10维特征升维到144维
-    # 提取position最后一个维度的维数
     position_dim = positions.shape[-1]
     embedding_dim = 2 * (position_dim + 1) * num_scale * num_heads
     feature_embedding_layer = hk.Linear(embedding_dim)
