@@ -7,7 +7,7 @@ sys.path.append(working_directory)
 import SCBIRL_Global_PE.SCBIRLTransformer as SIRLT
 import SCBIRL_Global_PE.utils as SIRLU
 import SCBIRL_Global_PE.migrationProcess as SIRLM
-from SCBIRL_Global_PE.utils import TravelData, Traveler, UserDataPart, convert_positions_to_utm
+from SCBIRL_Global_PE.utils import TravelData, Traveler, UserDataPart, coords2UTMmeters
 
 import numpy as np
 import pandas as pd
@@ -37,7 +37,6 @@ def loadModel(who, date = None, prior = True, accumulate = False, tabular = Fals
     
     iter_start_date = SIRLU.load_traveler(who).iter_start_date
     inputs, targets_action, pe_code, action_dim, state_dim = SIRLU.loadTrajChain(data_dir, type='before', start_date=iter_start_date)
-    pe_code = convert_positions_to_utm(pe_code)
     print(inputs.shape, targets_action.shape, pe_code.shape)
     model = SIRLT.avril(inputs, targets_action, pe_code, state_dim, action_dim, state_only=True)
     if tabular: 
@@ -67,7 +66,7 @@ def modelPredict(X: np.ndarray[float, float], model, standardize = False,
     assert X.shape[1] == feature_num + 2, "The input matrix does not have the correct number of features."
     state = X[:, :feature_num]
     positions = X[:, feature_num:feature_num+2]
-    positions = convert_positions_to_utm(positions)
+    positions = coords2UTMmeters(positions)
     # predict the reward
     state = state.reshape(1, -1, 1, state.shape[1])
     positions = positions.reshape(1, -1, 1, positions.shape[1])
@@ -333,16 +332,16 @@ if __name__ == '__main__':
     '''
     Inspect the baseline.
     '''
-    # model_dir = './model/'
-    # user_list = [int(name) for name in os.listdir(model_dir) if name.isdigit()]
-    # user_list.sort()
-    # reward_dict = dict()
-    # for user in user_list:
-    #     date_list = modelDateOfUser(user)
-    #     for date in date_list:
-    #         reward_dict[(user, date)] = modelRewardBaselineCalculation(date, who=user)
-    #         with open('./product/reward_res.pkl', 'wb') as f:
-    #                 pickle.dump(reward_dict, f)
+    model_dir = './model/'
+    user_list = [int(name) for name in os.listdir(model_dir) if name.isdigit()]
+    user_list.sort()
+    reward_dict = dict()
+    for user in user_list:
+        date_list = modelDateOfUser(user)
+        for date in date_list:
+            reward_dict[(user, date)] = modelRewardBaselineCalculation(date, who=user)
+            with open('./product/reward_res.pkl', 'wb') as f:
+                    pickle.dump(reward_dict, f)
     '''
     Test area
     '''

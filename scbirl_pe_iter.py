@@ -5,7 +5,7 @@ import SCBIRL_Global_PE.SCBIRLTransformer as SIRLT
 import SCBIRL_Global_PE.utils as SIRLU
 import SCBIRL_Global_PE.migrationProcess as SIRLP
 import Analysis.priorKnow as PriorKnow
-from SCBIRL_Global_PE.utils import Traveler, UserDataPart, convert_positions_to_utm
+from SCBIRL_Global_PE.utils import Traveler, UserDataPart
 # from Analysis.comparison_models import avril_without_pe
 
 import jax
@@ -24,7 +24,6 @@ def train_model_one_traveler(who: int, no_prior = True, initial = True, prior = 
     iter_start_date = SIRLU.load_traveler(who).iter_start_date
     # here the `iter_start_date` is a constant defined by utility module.
     inputs, targets_action, positions, action_dim, state_dim = SIRLU.loadTrajChain(data_dir, type='before', start_date=iter_start_date)
-    positions = convert_positions_to_utm(positions)
     # tabular rasa model
     model = SIRLT.avril(inputs, targets_action, positions, state_dim, action_dim, state_only=True)
     # model = avril_without_pe(inputs, targets_action,  state_dim, action_dim, state_only=True)
@@ -135,9 +134,9 @@ if __name__ =="__main__":
     '''
         Iteration Version
     '''
-    who_list = [1102234]
-    for who in who_list:
-        train_model_one_traveler(who = who)
+    # who_list = [1102234]
+    # for who in who_list:
+    #     train_model_one_traveler(who = who)
     '''
         Parallel Version
     '''
@@ -173,7 +172,7 @@ if __name__ =="__main__":
     done_who = []
     file_list = os.listdir(UserDataPart)
     who_list = [int(pid) for pid in file_list]
-    who_list = [10013454]
+    who_list = [1102234]
     for who in done_who:
         who_list.remove(who)
     with mp.Pool(MAX_CPU_COUNT) as pool:

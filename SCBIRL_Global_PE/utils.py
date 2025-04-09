@@ -25,46 +25,6 @@ UserDataPart = './data/user_data_survey/'
 
 Padding = -999
 
-def convert_positions_to_utm(positions, utm_crs="EPSG:32650"):
-    """
-    Convert geographic coordinates (longitude, latitude) to UTM coordinates in kilometers.
-    
-    Parameters:
-        positions: numpy array of shape (..., 2), where the last dimension is [lon, lat].
-                   For example, (30, 4, 2, 2) where the last two dimensions represent current 
-                   state and next state coordinates.
-        utm_crs: target UTM coordinate reference system (default: "EPSG:32650", which is UTM zone 50N).
-        
-    Returns:
-        A numpy array with the same shape as the input, with coordinates converted to UTM (km).
-    """
-    # Create a transformer from EPSG:4326 (WGS84) to the target UTM CRS.
-    transformer = Transformer.from_crs("EPSG:4326", utm_crs, always_xy=True)
-    
-    # Save the original shape of the input.
-    orig_shape = positions.shape
-    
-    # Reshape positions to (-1, 2) for conversion.
-    flat_positions = positions.reshape(-1, 2)
-    
-    # Extract longitude and latitude.
-    lons = flat_positions[:, 0]
-    lats = flat_positions[:, 1]
-    
-    # Convert longitude and latitude to UTM coordinates (in meters).
-    x_m, y_m = transformer.transform(lons, lats)
-    
-    # Convert from meters to kilometers.
-    x_km = np.array(x_m) / 1000.0
-    y_km = np.array(y_m) / 1000.0
-    
-    # Stack converted coordinates back together.
-    converted_flat = np.stack([x_km, y_km], axis=-1)
-    
-    # Reshape back to the original shape.
-    converted_positions = converted_flat.reshape(orig_shape)
-    return converted_positions
-
 def loadJsonFile(file_path):
     '''
     load travel json data as dict

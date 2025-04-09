@@ -66,5 +66,3 @@ Thumbs.db
 .envrc
 *.sqlite
 *.db
-
-model/
